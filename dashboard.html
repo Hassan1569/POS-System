@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - PharmaCare</title>
+    
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- SweetAlert2 -->
+    <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" rel="stylesheet">
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <i class="fas fa-prescription-bottle-alt"></i>
+            <span>PharmaCare</span>
+        </div>
+        
+        <div class="sidebar-menu" id="sidebarMenu">
+            <!-- Dashboard -->
+            <div class="menu-section">
+                <a href="dashboard.html" class="menu-item active">
+                    <i class="fas fa-chart-line"></i>
+                    <span>Dashboard</span>
+                </a>
+            </div>
+            
+            <!-- Inventory -->
+            <div class="menu-section">
+                <div class="menu-section-title">Inventory</div>
+                <a href="products.html" class="menu-item">
+                    <i class="fas fa-pills"></i>
+                    <span>All Products</span>
+                </a>
+                <a href="add-product.html" class="menu-item">
+                    <i class="fas fa-plus-circle"></i>
+                    <span>Add Product</span>
+                </a>
+                <a href="inventory.html" class="menu-item">
+                    <i class="fas fa-boxes"></i>
+                    <span>Stock Management</span>
+                </a>
+                <a href="expired-products.html" class="menu-item">
+                    <i class="fas fa-ban"></i>
+                    <span>Expired Products</span>
+                </a>
+            </div>
+            
+            <!-- Sales -->
+            <div class="menu-section">
+                <div class="menu-section-title">Sales</div>
+                <a href="pos.html" class="menu-item">
+                    <i class="fas fa-cash-register"></i>
+                    <span>POS / Billing</span>
+                </a>
+                <a href="sales.html" class="menu-item">
+                    <i class="fas fa-receipt"></i>
+                    <span>Sales History</span>
+                </a>
+                <a href="reports.html" class="menu-item">
+                    <i class="fas fa-chart-bar"></i>
+                    <span>Reports</span>
+                </a>
+            </div>
+            
+            <!-- Management -->
+            <div class="menu-section">
+                <div class="menu-section-title">Management</div>
+                <a href="users.html" class="menu-item">
+                    <i class="fas fa-users"></i>
+                    <span>Users</span>
+                </a>
+                <a href="settings.html" class="menu-item">
+                    <i class="fas fa-cog"></i>
+                    <span>Settings</span>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Topbar -->
+        <nav class="topbar">
+            <button class="btn btn-link sidebar-toggle" id="sidebarToggle">
+                <i class="fas fa-bars"></i>
+            </button>
+            
+            <div class="topbar-right">
+                <!-- Notifications -->
+                <div class="dropdown notification-dropdown">
+                    <button class="btn btn-link notification-btn" type="button" data-bs-toggle="dropdown">
+                        <i class="fas fa-bell"></i>
+                        <span class="notification-badge" id="notificationBadge">0</span>
+                    </button>
+                    <div class="dropdown-menu dropdown-menu-end notification-menu" id="notificationMenu">
+                        <div class="notification-header">
+                            <h6>Notifications</h6>
+                        </div>
+                        <div class="notification-list" id="notificationList">
+                            <!-- Notifications will be loaded here -->
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- User Profile -->
+                <div class="dropdown user-dropdown">
+                    <button class="btn btn-link user-btn" type="button" data-bs-toggle="dropdown">
+                        <div class="user-avatar">
+                            <i class="fas fa-user"></i>
+                        </div>
+                        <div class="user-info">
+                            <span class="user-name" id="userName">User</span>
+                            <small class="user-role" id="userRole">Role</small>
+                        </div>
+                        <i class="fas fa-chevron-down ms-2"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item" href="#" onclick="logout()"><i class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Page Content -->
+        <div class="page-content">
+            <div class="page-header">
+                <h1><i class="fas fa-chart-line me-2"></i>Dashboard</h1>
+                <p class="text-muted">Overview of your pharmacy management system</p>
+            </div>
+
+            <!-- Statistics Cards -->
+            <div class="row g-4 mb-4">
+                <div class="col-xl-3 col-md-6">
+                    <div class="stats-card stats-primary">
+                        <div class="stats-icon">
+                            <i class="fas fa-pills"></i>
+                        </div>
+                        <div class="stats-content">
+                            <h3 id="totalProducts">0</h3>
+                            <p>Total Products</p>
+                            <small class="stats-trend text-success">
+                                <i class="fas fa-arrow-up"></i> <span id="productsChange">0</span> this month
+                            </small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-3 col-md-6">
+                    <div class="stats-card stats-success">
+                        <div class="stats-icon">
+                            <i class="fas fa-boxes"></i>
+                        </div>
+                        <div class="stats-content">
+                            <h3 id="totalStock">0</h3>
+                            <p>Total Stock Units</p>
+                            <small class="stats-trend text-success">
+                                <i class="fas fa-arrow-up"></i> In stock
+                            </small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-3 col-md-6">
+                    <div class="stats-card stats-warning">
+                        <div class="stats-icon">
+                            <i class="fas fa-exclamation-triangle"></i>
+                        </div>
+                        <div class="stats-content">
+                            <h3 id="lowStockCount">0</h3>
+                            <p>Low Stock Products</p>
+                            <small class="stats-trend text-warning">
+                                <i class="fas fa-exclamation-circle"></i> Needs attention
+                            </small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-3 col-md-6">
+                    <div class="stats-card stats-danger">
+                        <div class="stats-icon">
+                            <i class="fas fa-calendar-times"></i>
+                        </div>
+                        <div class="stats-content">
+                            <h3 id="expiringCount">0</h3>
+                            <p>Expiring Soon</p>
+                            <small class="stats-trend text-danger">
+                                <i class="fas fa-clock"></i> Within 30 days
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Additional Stats Row -->
+            <div class="row g-4 mb-4">
+                <div class="col-xl-3 col-md-6">
+                    <div class="stats-card stats-info">
+                        <div class="stats-icon">
+                            <i class="fas fa-shopping-cart"></i>
+                        </div>
+                        <div class="stats-content">
+                            <h3 id="todaySales">0</h3>
+                            <p>Today's Sales</p>
+                            <small class="stats-trend text-info">
+                                <i class="fas fa-calendar-day"></i> Transactions
+                            </small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-3 col-md-6">
+                    <div class="stats-card stats-revenue">
+                        <div class="stats-icon">
+                            <i class="fas fa-dollar-sign"></i>
+                        </div>
+                        <div class="stats-content">
+                            <h3 id="todayRevenue">$0</h3>
+                            <p>Today's Revenue</p>
+                            <small class="stats-trend text-success">
+                                <i class="fas fa-arrow-up"></i> Net sales
+                            </small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-3 col-md-6">
+                    <div class="stats-card stats-expired">
+                        <div class="stats-icon">
+                            <i class="fas fa-ban"></i>
+                        </div>
+                        <div class="stats-content">
+                            <h3 id="expiredCount">0</h3>
+                            <p>Expired Products</p>
+                            <small class="stats-trend text-danger">
+                                <i class="fas fa-times-circle"></i> Not sellable
+                            </small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-3 col-md-6">
+                    <div class="stats-card stats-value">
+                        <div class="stats-icon">
+                            <i class="fas fa-chart-pie"></i>
+                        </div>
+                        <div class="stats-content">
+                            <h3 id="inventoryValue">$0</h3>
+                            <p>Inventory Value</p>
+                            <small class="stats-trend text-primary">
+                                <i class="fas fa-wallet"></i> Total worth
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Row -->
+            <div class="row g-4 mb-4">
+                <div class="col-xl-8">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="fas fa-chart-line me-2"></i>Sales Overview</h5>
+                            <div class="chart-period-selector">
+                                <button class="btn btn-sm btn-outline-primary active" onclick="changeSalesPeriod('daily')">Daily</button>
+                                <button class="btn btn-sm btn-outline-primary" onclick="changeSalesPeriod('weekly')">Weekly</button>
+                                <button class="btn btn-sm btn-outline-primary" onclick="changeSalesPeriod('monthly')">Monthly</button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="salesChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="fas fa-chart-pie me-2"></i>Inventory Status</h5>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="inventoryChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Category Distribution & Recent Sales -->
+            <div class="row g-4 mb-4">
+                <div class="col-xl-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="fas fa-th-large me-2"></i>Category Distribution</h5>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="categoryChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="fas fa-clock me-2"></i>Recent Sales</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="recent-sales-list" id="recentSalesList">
+                                <!-- Recent sales will be loaded here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    
+    <!-- App Scripts -->
+    <script src="app.js"></script>
+    <script src="dashboard-scripts.js"></script>
+</body>
+</html>

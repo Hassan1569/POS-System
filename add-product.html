@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Product - PharmaCare</title>
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <i class="fas fa-prescription-bottle-alt"></i>
+            <span>PharmaCare</span>
+        </div>
+        <div class="sidebar-menu" id="sidebarMenu"></div>
+    </div>
+
+    <div class="main-content">
+        <nav class="topbar">
+            <button class="btn btn-link sidebar-toggle" id="sidebarToggle">
+                <i class="fas fa-bars"></i>
+            </button>
+            
+            <div class="topbar-right">
+                <div class="dropdown notification-dropdown">
+                    <button class="btn btn-link notification-btn" type="button" data-bs-toggle="dropdown">
+                        <i class="fas fa-bell"></i>
+                        <span class="notification-badge" id="notificationBadge">0</span>
+                    </button>
+                    <div class="dropdown-menu dropdown-menu-end notification-menu">
+                        <div class="notification-header"><h6>Notifications</h6></div>
+                        <div class="notification-list" id="notificationList"></div>
+                    </div>
+                </div>
+                
+                <div class="dropdown user-dropdown">
+                    <button class="btn btn-link user-btn" type="button" data-bs-toggle="dropdown">
+                        <div class="user-avatar"><i class="fas fa-user"></i></div>
+                        <div class="user-info">
+                            <span class="user-name" id="userName">User</span>
+                            <small class="user-role" id="userRole">Role</small>
+                        </div>
+                        <i class="fas fa-chevron-down ms-2"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item" href="#" onclick="logout()"><i class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
+
+        <div class="page-content">
+            <div class="page-header">
+                <div>
+                    <h1><i class="fas fa-plus-circle me-2"></i><span id="pageTitle">Add Product</span></h1>
+                    <p class="text-muted">Add new product to inventory</p>
+                </div>
+                <a href="products.html" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left me-2"></i>Back to Products
+                </a>
+            </div>
+
+            <form id="productForm">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5><i class="fas fa-info-circle me-2"></i>Basic Information</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Product Name *</label>
+                                <input type="text" class="form-control" id="productName" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Generic Name *</label>
+                                <input type="text" class="form-control" id="genericName" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Brand Name *</label>
+                                <input type="text" class="form-control" id="brandName" required>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">SKU *</label>
+                                <input type="text" class="form-control" id="sku" required>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Barcode</label>
+                                <input type="text" class="form-control" id="barcode">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Category *</label>
+                                <select class="form-select" id="category" required></select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Product Type *</label>
+                                <select class="form-select" id="productType" required>
+                                    <option value="">Select Type</option>
+                                    <option value="Tablet">Tablet</option>
+                                    <option value="Capsule">Capsule</option>
+                                    <option value="Syrup">Syrup</option>
+                                    <option value="Injection">Injection</option>
+                                    <option value="Cream">Cream</option>
+                                    <option value="Ointment">Ointment</option>
+                                    <option value="Drop">Drop</option>
+                                    <option value="Device">Device</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Manufacturer *</label>
+                                <input type="text" class="form-control" id="manufacturer" required>
+                            </div>
+                            <div class="col-md-12">
+                                <label class="form-label">Description</label>
+                                <textarea class="form-control" id="description" rows="3"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5><i class="fas fa-box me-2"></i>Batch Information</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label">Batch Number *</label>
+                                <input type="text" class="form-control" id="batchNumber" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Quantity *</label>
+                                <input type="number" class="form-control" id="quantity" min="0" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Unit *</label>
+                                <select class="form-select" id="unit" required>
+                                    <option value="Strip">Strip</option>
+                                    <option value="Bottle">Bottle</option>
+                                    <option value="Box">Box</option>
+                                    <option value="Vial">Vial</option>
+                                    <option value="Tube">Tube</option>
+                                    <option value="Piece">Piece</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Purchase Price *</label>
+                                <input type="number" class="form-control" id="purchasePrice" min="0" step="0.01" required>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Selling Price *</label>
+                                <input type="number" class="form-control" id="sellingPrice" min="0" step="0.01" required>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">MRP *</label>
+                                <input type="number" class="form-control" id="mrp" min="0" step="0.01" required>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Tax (%)</label>
+                                <input type="number" class="form-control" id="tax" min="0" max="100" value="5">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Manufacturing Date *</label>
+                                <input type="date" class="form-control" id="manufacturingDate" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Expiry Date *</label>
+                                <input type="date" class="form-control" id="expiryDate" required>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5><i class="fas fa-warehouse me-2"></i>Stock Settings</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Minimum Stock Level *</label>
+                                <input type="number" class="form-control" id="minStock" min="0" required value="10">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Reorder Level *</label>
+                                <input type="number" class="form-control" id="reorderLevel" min="0" required value="20">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5><i class="fas fa-truck me-2"></i>Supplier & Additional Information</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Supplier Name</label>
+                                <input type="text" class="form-control" id="supplier">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Supplier Contact</label>
+                                <input type="text" class="form-control" id="supplierContact">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Storage Instructions</label>
+                                <input type="text" class="form-control" id="storageInstructions" value="Store at room temperature">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Prescription Required</label>
+                                <select class="form-select" id="prescriptionRequired">
+                                    <option value="false">No</option>
+                                    <option value="true">Yes</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-2"></i>Save Product
+                    </button>
+                    <a href="products.html" class="btn btn-secondary">
+                        <i class="fas fa-times me-2"></i>Cancel
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="app.js"></script>
+    
+    <script>
+        let editMode = false;
+        let editProductId = null;
+
+        function loadCategories() {
+            const categories = JSON.parse(localStorage.getItem('pharmacy_categories') || '[]');
+            const categorySelect = document.getElementById('category');
+            
+            categorySelect.innerHTML = '<option value="">Select Category</option>';
+            categories.forEach(cat => {
+                categorySelect.innerHTML += `<option value="${cat}">${cat}</option>`;
+            });
+        }
+
+        function checkEditMode() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const editId = urlParams.get('edit');
+            
+            if (editId) {
+                editMode = true;
+                editProductId = parseInt(editId);
+                document.getElementById('pageTitle').textContent = 'Edit Product';
+                loadProductForEdit(editProductId);
+            }
+        }
+
+        function loadProductForEdit(productId) {
+            const products = JSON.parse(localStorage.getItem('pharmacy_products') || '[]');
+            const product = products.find(p => p.id === productId);
+            
+            if (!product) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Product Not Found',
+                    text: 'The product you are trying to edit does not exist.'
+                }).then(() => {
+                    window.location.href = 'products.html';
+                });
+                return;
+            }
+
+            // Fill basic info
+            document.getElementById('productName').value = product.name;
+            document.getElementById('genericName').value = product.genericName;
+            document.getElementById('brandName').value = product.brand;
+            document.getElementById('sku').value = product.sku;
+            document.getElementById('barcode').value = product.barcode || '';
+            document.getElementById('category').value = product.category;
+            document.getElementById('productType').value = product.type;
+            document.getElementById('manufacturer').value = product.manufacturer;
+            document.getElementById('description').value = product.description || '';
+
+            // Fill first batch info (for simplicity)
+            if (product.batches && product.batches.length > 0) {
+                const batch = product.batches[0];
+                document.getElementById('batchNumber').value = batch.batchNumber;
+                document.getElementById('quantity').value = batch.quantity;
+                document.getElementById('unit').value = batch.unit;
+                document.getElementById('purchasePrice').value = batch.purchasePrice;
+                document.getElementById('sellingPrice').value = batch.sellingPrice;
+                document.getElementById('mrp').value = batch.mrp;
+                document.getElementById('tax').value = batch.tax;
+                document.getElementById('manufacturingDate').value = batch.manufacturingDate;
+                document.getElementById('expiryDate').value = batch.expiryDate;
+            }
+
+            // Fill stock settings
+            document.getElementById('minStock').value = product.minStock;
+            document.getElementById('reorderLevel').value = product.reorderLevel;
+
+            // Fill supplier info
+            document.getElementById('supplier').value = product.supplier || '';
+            document.getElementById('supplierContact').value = product.supplierContact || '';
+            document.getElementById('storageInstructions').value = product.storageInstructions || '';
+            document.getElementById('prescriptionRequired').value = product.prescriptionRequired.toString();
+        }
+
+        document.getElementById('productForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            // Validate expiry date
+            const mfgDate = new Date(document.getElementById('manufacturingDate').value);
+            const expDate = new Date(document.getElementById('expiryDate').value);
+            
+            if (expDate <= mfgDate) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Invalid Dates',
+                    text: 'Expiry date must be after manufacturing date'
+                });
+                return;
+            }
+
+            // Validate prices
+            const purchasePrice = parseFloat(document.getElementById('purchasePrice').value);
+            const sellingPrice = parseFloat(document.getElementById('sellingPrice').value);
+            const mrp = parseFloat(document.getElementById('mrp').value);
+
+            if (sellingPrice < purchasePrice) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Price Warning',
+                    text: 'Selling price is less than purchase price. Are you sure?',
+                    showCancelButton: true,
+                    confirmButtonText: 'Yes, Continue'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        saveProduct();
+                    }
+                });
+                return;
+            }
+
+            saveProduct();
+        });
+
+        function saveProduct() {
+            const products = JSON.parse(localStorage.getItem('pharmacy_products') || '[]');
+            
+            const productData = {
+                name: document.getElementById('productName').value,
+                genericName: document.getElementById('genericName').value,
+                brand: document.getElementById('brandName').value,
+                sku: document.getElementById('sku').value,
+                barcode: document.getElementById('barcode').value || '',
+                category: document.getElementById('category').value,
+                type: document.getElementById('productType').value,
+                manufacturer: document.getElementById('manufacturer').value,
+                description: document.getElementById('description').value,
+                prescriptionRequired: document.getElementById('prescriptionRequired').value === 'true',
+                supplier: document.getElementById('supplier').value,
+                supplierContact: document.getElementById('supplierContact').value,
+                storageInstructions: document.getElementById('storageInstructions').value,
+                batches: [
+                    {
+                        batchNumber: document.getElementById('batchNumber').value,
+                        quantity: parseInt(document.getElementById('quantity').value),
+                        purchasePrice: parseFloat(document.getElementById('purchasePrice').value),
+                        sellingPrice: parseFloat(document.getElementById('sellingPrice').value),
+                        mrp: parseFloat(document.getElementById('mrp').value),
+                        tax: parseFloat(document.getElementById('tax').value),
+                        manufacturingDate: document.getElementById('manufacturingDate').value,
+                        expiryDate: document.getElementById('expiryDate').value,
+                        unit: document.getElementById('unit').value
+                    }
+                ],
+                minStock: parseInt(document.getElementById('minStock').value),
+                reorderLevel: parseInt(document.getElementById('reorderLevel').value),
+                updatedAt: new Date().toISOString()
+            };
+
+            if (editMode) {
+                // Update existing product
+                const productIndex = products.findIndex(p => p.id === editProductId);
+                if (productIndex !== -1) {
+                    products[productIndex] = {
+                        ...products[productIndex],
+                        ...productData
+                    };
+                }
+                
+                localStorage.setItem('pharmacy_products', JSON.stringify(products));
+                
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Product Updated',
+                    text: 'Product has been updated successfully',
+                    timer: 2000,
+                    showConfirmButton: false
+                }).then(() => {
+                    window.location.href = 'products.html';
+                });
+            } else {
+                // Add new product
+                const nextId = parseInt(localStorage.getItem('pharmacy_next_product_id') || '1');
+                
+                const newProduct = {
+                    id: nextId,
+                    ...productData,
+                    createdAt: new Date().toISOString()
+                };
+                
+                products.push(newProduct);
+                localStorage.setItem('pharmacy_products', JSON.stringify(products));
+                localStorage.setItem('pharmacy_next_product_id', (nextId + 1).toString());
+                
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Product Added',
+                    text: 'Product has been added successfully',
+                    timer: 2000,
+                    showConfirmButton: false
+                }).then(() => {
+                    window.location.href = 'products.html';
+                });
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            if (!window.location.pathname.includes('add-product')) return;
+            
+            const currentUser = JSON.parse(localStorage.getItem('pharmacy_current_user') || '{}');
+            if (currentUser.role !== 'admin') {
+                window.location.href = 'dashboard.html';
+                return;
+            }
+            
+            loadCategories();
+            checkEditMode();
+        });
+    </script>
+</body>
+</html>

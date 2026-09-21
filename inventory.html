@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventory Management - PharmaCare</title>
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <i class="fas fa-prescription-bottle-alt"></i>
+            <span>PharmaCare</span>
+        </div>
+        <div class="sidebar-menu" id="sidebarMenu"></div>
+    </div>
+
+    <div class="main-content">
+        <nav class="topbar">
+            <button class="btn btn-link sidebar-toggle" id="sidebarToggle">
+                <i class="fas fa-bars"></i>
+            </button>
+            
+            <div class="topbar-right">
+                <div class="dropdown notification-dropdown">
+                    <button class="btn btn-link notification-btn" type="button" data-bs-toggle="dropdown">
+                        <i class="fas fa-bell"></i>
+                        <span class="notification-badge" id="notificationBadge">0</span>
+                    </button>
+                    <div class="dropdown-menu dropdown-menu-end notification-menu">
+                        <div class="notification-header"><h6>Notifications</h6></div>
+                        <div class="notification-list" id="notificationList"></div>
+                    </div>
+                </div>
+                
+                <div class="dropdown user-dropdown">
+                    <button class="btn btn-link user-btn" type="button" data-bs-toggle="dropdown">
+                        <div class="user-avatar"><i class="fas fa-user"></i></div>
+                        <div class="user-info">
+                            <span class="user-name" id="userName">User</span>
+                            <small class="user-role" id="userRole">Role</small>
+                        </div>
+                        <i class="fas fa-chevron-down ms-2"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item" href="#" onclick="logout()"><i class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
+
+        <div class="page-content">
+            <div class="page-header">
+                <h1><i class="fas fa-boxes me-2"></i>Inventory Management</h1>
+                <p class="text-muted">Monitor and manage your pharmacy inventory</p>
+            </div>
+
+            <!-- Inventory Overview Cards -->
+            <div class="row g-4 mb-4">
+                <div class="col-md-3">
+                    <div class="stats-card stats-primary">
+                        <div class="stats-icon">
+                            <i class="fas fa-cubes"></i>
+                        </div>
+                        <div class="stats-content">
+                            <h3 id="totalItems">0</h3>
+                            <p>Total Items</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stats-card stats-success">
+                        <div class="stats-icon">
+                            <i class="fas fa-check-circle"></i>
+                        </div>
+                        <div class="stats-content">
+                            <h3 id="inStockItems">0</h3>
+                            <p>In Stock</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stats-card stats-warning">
+                        <div class="stats-icon">
+                            <i class="fas fa-exclamation-triangle"></i>
+                        </div>
+                        <div class="stats-content">
+                            <h3 id="lowStockItems">0</h3>
+                            <p>Low Stock</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stats-card stats-danger">
+                        <div class="stats-icon">
+                            <i class="fas fa-times-circle"></i>
+                        </div>
+                        <div class="stats-content">
+                            <h3 id="outOfStockItems">0</h3>
+                            <p>Out of Stock</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabs -->
+            <div class="card">
+                <div class="card-header">
+                    <ul class="nav nav-tabs card-header-tabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#lowStock" type="button">
+                                <i class="fas fa-exclamation-triangle me-2"></i>Low Stock
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#expiringSoon" type="button">
+                                <i class="fas fa-clock me-2"></i>Expiring Soon
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#outOfStock" type="button">
+                                <i class="fas fa-ban me-2"></i>Out of Stock
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+                <div class="card-body">
+                    <div class="tab-content">
+                        <!-- Low Stock Tab -->
+                        <div class="tab-pane fade show active" id="lowStock" role="tabpanel">
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Product</th>
+                                            <th>Category</th>
+                                            <th>Current Stock</th>
+                                            <th>Reorder Level</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="lowStockTableBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Expiring Soon Tab -->
+                        <div class="tab-pane fade" id="expiringSoon" role="tabpanel">
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Product</th>
+                                            <th>Batch</th>
+                                            <th>Stock</th>
+                                            <th>Expiry Date</th>
+                                            <th>Days Remaining</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="expiringTableBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Out of Stock Tab -->
+                        <div class="tab-pane fade" id="outOfStock" role="tabpanel">
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Product</th>
+                                            <th>Category</th>
+                                            <th>SKU</th>
+                                            <th>Last Updated</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="outOfStockTableBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="app.js"></script>
+    
+    <script>
+        function loadInventoryStats() {
+            const products = JSON.parse(localStorage.getItem('pharmacy_products') || '[]');
+            const now = new Date();
+            
+            let inStock = 0;
+            let lowStock = 0;
+            let outOfStock = 0;
+            
+            products.forEach(product => {
+                const totalStock = product.batches.reduce((sum, batch) => {
+                    const expiryDate = new Date(batch.expiryDate);
+                    return expiryDate >= now ? sum + batch.quantity : sum;
+                }, 0);
+                
+                if (totalStock === 0) {
+                    outOfStock++;
+                } else if (totalStock <= product.reorderLevel) {
+                    lowStock++;
+                } else {
+                    inStock++;
+                }
+            });
+            
+            document.getElementById('totalItems').textContent = products.length;
+            document.getElementById('inStockItems').textContent = inStock;
+            document.getElementById('lowStockItems').textContent = lowStock;
+            document.getElementById('outOfStockItems').textContent = outOfStock;
+        }
+
+        function loadLowStockProducts() {
+            const products = JSON.parse(localStorage.getItem('pharmacy_products') || '[]');
+            const tbody = document.getElementById('lowStockTableBody');
+            const now = new Date();
+            
+            const lowStockProducts = products.filter(product => {
+                const totalStock = product.batches.reduce((sum, batch) => {
+                    const expiryDate = new Date(batch.expiryDate);
+                    return expiryDate >= now ? sum + batch.quantity : sum;
+                }, 0);
+                return totalStock > 0 && totalStock <= product.reorderLevel;
+            });
+            
+            if (lowStockProducts.length === 0) {
+                tbody.innerHTML = `
+                    <tr><td colspan="5">
+                        <div class="empty-state">
+                            <i class="fas fa-check-circle"></i>
+                            <h4>No Low Stock Items</h4>
+                            <p>All products are adequately stocked</p>
+                        </div>
+                    </td></tr>
+                `;
+                return;
+            }
+            
+            tbody.innerHTML = lowStockProducts.map(product => {
+                const totalStock = product.batches.reduce((sum, batch) => {
+                    const expiryDate = new Date(batch.expiryDate);
+                    return expiryDate >= now ? sum + batch.quantity : sum;
+                }, 0);
+                
+                return `
+                    <tr>
+                        <td><strong>${product.name}</strong><br><small class="text-muted">${product.genericName}</small></td>
+                        <td>${product.category}</td>
+                        <td><strong class="text-warning">${totalStock}</strong></td>
+                        <td>${product.reorderLevel}</td>
+                        <td><span class="badge badge-warning">Low Stock</span></td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function loadExpiringProducts() {
+            const products = JSON.parse(localStorage.getItem('pharmacy_products') || '[]');
+            const tbody = document.getElementById('expiringTableBody');
+            const now = new Date();
+            const settings = JSON.parse(localStorage.getItem('pharmacy_settings') || '{}');
+            const warningDays = settings.expiryWarningDays || 30;
+            
+            const expiringBatches = [];
+            
+            products.forEach(product => {
+                product.batches.forEach(batch => {
+                    const expiryDate = new Date(batch.expiryDate);
+                    const daysUntilExpiry = Math.floor((expiryDate - now) / (1000 * 60 * 60 * 24));
+                    
+                    if (daysUntilExpiry >= 0 && daysUntilExpiry <= warningDays && batch.quantity > 0) {
+                        expiringBatches.push({
+                            product: product,
+                            batch: batch,
+                            daysUntilExpiry: daysUntilExpiry
+                        });
+                    }
+                });
+            });
+            
+            expiringBatches.sort((a, b) => a.daysUntilExpiry - b.daysUntilExpiry);
+            
+            if (expiringBatches.length === 0) {
+                tbody.innerHTML = `
+                    <tr><td colspan="6">
+                        <div class="empty-state">
+                            <i class="fas fa-check-circle"></i>
+                            <h4>No Products Expiring Soon</h4>
+                            <p>All products have safe expiry dates</p>
+                        </div>
+                    </td></tr>
+                `;
+                return;
+            }
+            
+            tbody.innerHTML = expiringBatches.map(item => {
+                const expiryDate = new Date(item.batch.expiryDate);
+                let statusBadge = '';
+                
+                if (item.daysUntilExpiry <= 7) {
+                    statusBadge = '<span class="badge badge-danger">Critical</span>';
+                } else if (item.daysUntilExpiry <= 30) {
+                    statusBadge = '<span class="badge badge-warning">Warning</span>';
+                }
+                
+                return `
+                    <tr>
+                        <td><strong>${item.product.name}</strong></td>
+                        <td>${item.batch.batchNumber}</td>
+                        <td>${item.batch.quantity}</td>
+                        <td>${expiryDate.toLocaleDateString()}</td>
+                        <td><strong>${item.daysUntilExpiry} days</strong></td>
+                        <td>${statusBadge}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function loadOutOfStockProducts() {
+            const products = JSON.parse(localStorage.getItem('pharmacy_products') || '[]');
+            const tbody = document.getElementById('outOfStockTableBody');
+            const now = new Date();
+            
+            const outOfStockProducts = products.filter(product => {
+                const totalStock = product.batches.reduce((sum, batch) => {
+                    const expiryDate = new Date(batch.expiryDate);
+                    return expiryDate >= now ? sum + batch.quantity : sum;
+                }, 0);
+                return totalStock === 0;
+            });
+            
+            if (outOfStockProducts.length === 0) {
+                tbody.innerHTML = `
+                    <tr><td colspan="4">
+                        <div class="empty-state">
+                            <i class="fas fa-check-circle"></i>
+                            <h4>No Out of Stock Items</h4>
+                            <p>All products have available stock</p>
+                        </div>
+                    </td></tr>
+                `;
+                return;
+            }
+            
+            tbody.innerHTML = outOfStockProducts.map(product => {
+                const updatedDate = new Date(product.updatedAt);
+                
+                return `
+                    <tr>
+                        <td><strong>${product.name}</strong><br><small class="text-muted">${product.genericName}</small></td>
+                        <td>${product.category}</td>
+                        <td>${product.sku}</td>
+                        <td>${updatedDate.toLocaleDateString()}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            if (!window.location.pathname.includes('inventory')) return;
+            
+            loadInventoryStats();
+            loadLowStockProducts();
+            loadExpiringProducts();
+            loadOutOfStockProducts();
+        });
+    </script>
+</body>
+</html>

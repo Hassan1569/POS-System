@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Expired Products - PharmaCare</title>
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <i class="fas fa-prescription-bottle-alt"></i>
+            <span>PharmaCare</span>
+        </div>
+        <div class="sidebar-menu" id="sidebarMenu"></div>
+    </div>
+
+    <div class="main-content">
+        <nav class="topbar">
+            <button class="btn btn-link sidebar-toggle" id="sidebarToggle">
+                <i class="fas fa-bars"></i>
+            </button>
+            
+            <div class="topbar-right">
+                <div class="dropdown notification-dropdown">
+                    <button class="btn btn-link notification-btn" type="button" data-bs-toggle="dropdown">
+                        <i class="fas fa-bell"></i>
+                        <span class="notification-badge" id="notificationBadge">0</span>
+                    </button>
+                    <div class="dropdown-menu dropdown-menu-end notification-menu">
+                        <div class="notification-header"><h6>Notifications</h6></div>
+                        <div class="notification-list" id="notificationList"></div>
+                    </div>
+                </div>
+                
+                <div class="dropdown user-dropdown">
+                    <button class="btn btn-link user-btn" type="button" data-bs-toggle="dropdown">
+                        <div class="user-avatar"><i class="fas fa-user"></i></div>
+                        <div class="user-info">
+                            <span class="user-name" id="userName">User</span>
+                            <small class="user-role" id="userRole">Role</small>
+                        </div>
+                        <i class="fas fa-chevron-down ms-2"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item" href="#" onclick="logout()"><i class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
+
+        <div class="page-content">
+            <div class="page-header">
+                <h1><i class="fas fa-ban me-2"></i>Expired Products</h1>
+                <p class="text-muted">View and manage expired products</p>
+            </div>
+
+            <!-- Summary Card -->
+            <div class="row g-4 mb-4">
+                <div class="col-md-3">
+                    <div class="stats-card stats-danger">
+                        <div class="stats-icon">
+                            <i class="fas fa-calendar-times"></i>
+                        </div>
+                        <div class="stats-content">
+                            <h3 id="totalExpired">0</h3>
+                            <p>Expired Batches</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stats-card stats-warning">
+                        <div class="stats-icon">
+                            <i class="fas fa-box"></i>
+                        </div>
+                        <div class="stats-content">
+                            <h3 id="totalExpiredUnits">0</h3>
+                            <p>Total Units</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stats-card stats-info">
+                        <div class="stats-icon">
+                            <i class="fas fa-dollar-sign"></i>
+                        </div>
+                        <div class="stats-content">
+                            <h3 id="expiredValue">$0</h3>
+                            <p>Estimated Value</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stats-card stats-primary">
+                        <div class="stats-icon">
+                            <i class="fas fa-pills"></i>
+                        </div>
+                        <div class="stats-content">
+                            <h3 id="uniqueProducts">0</h3>
+                            <p>Unique Products</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Expired Products Table -->
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-list me-2"></i>Expired Product Details</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-danger" role="alert">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>Important:</strong> These products cannot be sold and should be properly disposed of according to pharmaceutical regulations.
+                    </div>
+                    
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Product</th>
+                                    <th>Batch Number</th>
+                                    <th>Quantity</th>
+                                    <th>Expiry Date</th>
+                                    <th>Days Expired</th>
+                                    <th>Purchase Price</th>
+                                    <th>Total Value</th>
+                                    <th>Supplier</th>
+                                </tr>
+                            </thead>
+                            <tbody id="expiredTableBody">
+                                <tr>
+                                    <td colspan="8" class="text-center">Loading...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="app.js"></script>
+    
+    <script>
+        function loadExpiredProducts() {
+            const products = JSON.parse(localStorage.getItem('pharmacy_products') || '[]');
+            const settings = JSON.parse(localStorage.getItem('pharmacy_settings') || '{}');
+            const currencySymbol = settings.currencySymbol || '$';
+            const now = new Date();
+            
+            const expiredBatches = [];
+            let totalValue = 0;
+            let totalUnits = 0;
+            const uniqueProductIds = new Set();
+            
+            products.forEach(product => {
+                product.batches.forEach(batch => {
+                    const expiryDate = new Date(batch.expiryDate);
+                    const daysExpired = Math.floor((now - expiryDate) / (1000 * 60 * 60 * 24));
+                    
+                    if (daysExpired > 0 && batch.quantity > 0) {
+                        expiredBatches.push({
+                            product: product,
+                            batch: batch,
+                            daysExpired: daysExpired,
+                            expiryDate: expiryDate
+                        });
+                        
+                        totalValue += batch.quantity * batch.purchasePrice;
+                        totalUnits += batch.quantity;
+                        uniqueProductIds.add(product.id);
+                    }
+                });
+            });
+            
+            // Update stats
+            document.getElementById('totalExpired').textContent = expiredBatches.length;
+            document.getElementById('totalExpiredUnits').textContent = totalUnits;
+            document.getElementById('expiredValue').textContent = currencySymbol + totalValue.toFixed(2);
+            document.getElementById('uniqueProducts').textContent = uniqueProductIds.size;
+            
+            // Sort by days expired (most recent first)
+            expiredBatches.sort((a, b) => a.daysExpired - b.daysExpired);
+            
+            const tbody = document.getElementById('expiredTableBody');
+            
+            if (expiredBatches.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="8">
+                            <div class="empty-state">
+                                <i class="fas fa-check-circle"></i>
+                                <h4>No Expired Products</h4>
+                                <p>Your inventory currently has no expired products</p>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            tbody.innerHTML = expiredBatches.map(item => {
+                const batchValue = item.batch.quantity * item.batch.purchasePrice;
+                
+                return `
+                    <tr>
+                        <td>
+                            <strong>${item.product.name}</strong>
+                            <br>
+                            <small class="text-muted">${item.product.genericName}</small>
+                        </td>
+                        <td>${item.batch.batchNumber}</td>
+                        <td><strong class="text-danger">${item.batch.quantity}</strong> ${item.batch.unit}</td>
+                        <td>${item.expiryDate.toLocaleDateString()}</td>
+                        <td><span class="badge badge-danger">${item.daysExpired} days</span></td>
+                        <td>${currencySymbol}${item.batch.purchasePrice.toFixed(2)}</td>
+                        <td><strong>${currencySymbol}${batchValue.toFixed(2)}</strong></td>
+                        <td>${item.product.supplier || '-'}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            if (!window.location.pathname.includes('expired')) return;
+            
+            loadExpiredProducts();
+        });
+    </script>
+</body>
+</html>

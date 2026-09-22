@@ -1,576 +1,403 @@
-// POS functionality with FEFO logic
-
+/**
+ * Pharmacy POS — checkout and FEFO allocation engine.
+ * Cart is product-level; batch consumption is resolved atomically at confirmation.
+ */
 let cart = [];
 let currentInvoiceData = null;
 
-// Search products
+function getProducts() { return Storage.get(STORAGE_KEYS.PRODUCTS, []); }
+function getSettings() { return Storage.get(STORAGE_KEYS.SETTINGS, {}); }
+function getCurrentUser() { return Storage.get(STORAGE_KEYS.CURRENT_USER, {}); }
+
+function getValidBatches(product) {
+    return (product?.batches || [])
+        .filter(batch => Number(batch.quantity) > 0 && !Utils.isExpired(batch.expiryDate))
+        .sort((a, b) => new Date(a.expiryDate) - new Date(b.expiryDate));
+}
+
+function previewAllocations(product, quantity) {
+    return Utils.allocateBatchesFEFO(product, Number(quantity));
+}
+
+function getProductAvailableStock(product) {
+    return getValidBatches(product).reduce((sum, batch) => sum + Number(batch.quantity || 0), 0);
+}
+
 function searchProducts() {
-    const searchTerm = document.getElementById('posSearchInput').value.toLowerCase().trim();
+    const input = document.getElementById('posSearchInput');
     const searchResults = document.getElementById('searchResults');
-    
+    if (!input || !searchResults) return;
+
+    const searchTerm = input.value.toLowerCase().trim();
     if (searchTerm.length < 2) {
-        searchResults.innerHTML = `
-            <div class="text-center text-muted py-5">
-                <i class="fas fa-search fa-3x mb-3 opacity-25"></i>
-                <p>Start typing to search products</p>
-            </div>
-        `;
+        searchResults.innerHTML = `<div class="text-center text-muted py-5"><i class="fas fa-search fa-3x mb-3 opacity-25"></i><p>Start typing to search products</p></div>`;
         return;
     }
-    
-    const products = JSON.parse(localStorage.getItem('pharmacy_products') || '[]');
-    const settings = JSON.parse(localStorage.getItem('pharmacy_settings') || '{}');
-    const currencySymbol = settings.currencySymbol || '$';
-    const now = new Date();
-    
-    // Filter products
+
+    const products = getProducts();
+    const settings = getSettings();
+    const symbol = settings.currencySymbol || '$';
+
     const results = products.filter(product => {
-        return product.name.toLowerCase().includes(searchTerm) ||
-               product.genericName.toLowerCase().includes(searchTerm) ||
-               product.brand.toLowerCase().includes(searchTerm) ||
-               product.sku.toLowerCase().includes(searchTerm) ||
-               product.barcode.includes(searchTerm);
-    }).filter(product => {
-        // Filter out expired products
-        const hasValidStock = product.batches.some(batch => {
-            const expiryDate = new Date(batch.expiryDate);
-            return expiryDate >= now && batch.quantity > 0;
-        });
-        return hasValidStock;
+        const haystack = [
+            product.name, product.genericName, product.brand, product.sku, product.barcode, product.category
+        ].map(v => String(v || '').toLowerCase());
+        return haystack.some(v => v.includes(searchTerm)) && getProductAvailableStock(product) > 0;
     });
-    
-    if (results.length === 0) {
-        searchResults.innerHTML = `
-            <div class="empty-state">
-                <i class="fas fa-search"></i>
-                <h4>No Products Found</h4>
-                <p>No products match your search criteria</p>
-            </div>
-        `;
+
+    if (!results.length) {
+        searchResults.innerHTML = `<div class="empty-state"><i class="fas fa-search"></i><h4>No Products Found</h4><p>No sellable, non-expired stock matches your search.</p></div>`;
         return;
     }
-    
+
     searchResults.innerHTML = results.map(product => {
-        const totalStock = product.batches.reduce((sum, batch) => {
-            const expiryDate = new Date(batch.expiryDate);
-            return expiryDate >= now ? sum + batch.quantity : sum;
-        }, 0);
-        
-        // Get selling price from earliest expiring valid batch
-        let validBatches = product.batches.filter(batch => {
-            const expiryDate = new Date(batch.expiryDate);
-            return expiryDate >= now && batch.quantity > 0;
-        }).sort((a, b) => new Date(a.expiryDate) - new Date(b.expiryDate));
-        
-        const sellingPrice = validBatches.length > 0 ? validBatches[0].sellingPrice : 0;
-        
-        let stockBadge = '';
-        if (totalStock === 0) {
-            stockBadge = '<span class="badge badge-danger">Out of Stock</span>';
-        } else if (totalStock <= product.reorderLevel) {
-            stockBadge = '<span class="badge badge-warning">Low Stock</span>';
-        } else {
-            stockBadge = '<span class="badge badge-success">In Stock</span>';
-        }
-        
+        const batches = getValidBatches(product);
+        const stock = getProductAvailableStock(product);
+        const first = batches[0];
+        const status = Utils.calculateStockStatus(product);
+        const safe = typeof Utils.escapeHTML === 'function' ? Utils.escapeHTML : v => String(v ?? '');
         return `
-            <div class="search-result-item" onclick='addToCart(${JSON.stringify(product)})'>
+            <div class="search-result-item" data-product-id="${safe(product.id)}" onclick='addToCart(${JSON.stringify(product).replace(/'/g, "&#39;")})'>
                 <div class="search-result-info">
-                    <h6>${product.name}</h6>
-                    <small>${product.genericName} - ${product.brand}</small>
-                    <small class="d-block">SKU: ${product.sku} | ${stockBadge}</small>
+                    <h6>${safe(product.name)}</h6>
+                    <small>${safe(product.genericName)} - ${safe(product.brand)}</small>
+                    <small class="d-block">SKU: ${safe(product.sku)} | <span class="badge ${status.badgeClass}">${status.label}</span></small>
                 </div>
                 <div class="search-result-price">
-                    <div class="price">${currencySymbol}${sellingPrice}</div>
-                    <div class="stock">Stock: ${totalStock}</div>
+                    <div class="price">${symbol}${Number(first.sellingPrice || 0).toFixed(2)}</div>
+                    <div class="stock">Valid stock: ${stock}</div>
                 </div>
-            </div>
-        `;
+            </div>`;
     }).join('');
 }
 
-// Add to cart with FEFO logic
 function addToCart(product) {
-    const now = new Date();
-    
-    // Get valid batches (not expired, has stock)
-    const validBatches = product.batches.filter(batch => {
-        const expiryDate = new Date(batch.expiryDate);
-        return expiryDate >= now && batch.quantity > 0;
-    }).sort((a, b) => new Date(a.expiryDate) - new Date(b.expiryDate));
-    
-    if (validBatches.length === 0) {
-        Swal.fire({
-            icon: 'error',
-            title: 'Cannot Add',
-            text: 'This product has no valid stock available',
-            confirmButtonColor: '#3b82f6'
-        });
+    const fresh = getProducts().find(p => String(p.id) === String(product.id));
+    if (!fresh) return;
+
+    const available = getProductAvailableStock(fresh);
+    if (available < 1) {
+        Swal.fire({icon:'error', title:'Cannot Add', text:'This product has no non-expired stock available.'});
         return;
     }
-    
-    // Use earliest expiring batch (FEFO)
-    const selectedBatch = validBatches[0];
-    
-    // Check if already in cart
-    const existingItem = cart.find(item => 
-        item.productId === product.id && item.batchNumber === selectedBatch.batchNumber
-    );
-    
-    if (existingItem) {
-        // Check stock limit
-        if (existingItem.quantity >= selectedBatch.quantity) {
-            Swal.fire({
-                icon: 'warning',
-                title: 'Stock Limit',
-                text: `Only ${selectedBatch.quantity} units available in this batch`,
-                confirmButtonColor: '#3b82f6'
-            });
+
+    const existing = cart.find(item => String(item.productId) === String(fresh.id));
+    if (existing) {
+        if (existing.quantity >= available) {
+            Swal.fire({icon:'warning', title:'Stock Limit', text:`Only ${available} non-expired units are available.`});
             return;
         }
-        existingItem.quantity++;
-        existingItem.total = existingItem.quantity * existingItem.unitPrice;
+        existing.quantity += 1;
     } else {
         cart.push({
-            productId: product.id,
-            productName: product.name,
-            genericName: product.genericName,
-            batchNumber: selectedBatch.batchNumber,
-            expiryDate: selectedBatch.expiryDate,
-            unitPrice: selectedBatch.sellingPrice,
+            productId: fresh.id,
+            productName: fresh.name,
+            genericName: fresh.genericName || '',
             quantity: 1,
-            total: selectedBatch.sellingPrice,
-            maxStock: selectedBatch.quantity,
-            unit: selectedBatch.unit
+            unit: fresh.unit || fresh.batches?.[0]?.unit || 'Unit'
         });
     }
-    
+    persistCart();
     renderCart();
     updateCartSummary();
 }
 
-// Render cart
+function persistCart() {
+    Storage.set(STORAGE_KEYS.ACTIVE_CART, cart);
+}
+
 function renderCart() {
     const cartItems = document.getElementById('cartItems');
-    const settings = JSON.parse(localStorage.getItem('pharmacy_settings') || '{}');
-    const currencySymbol = settings.currencySymbol || '$';
-    
-    if (cart.length === 0) {
-        cartItems.innerHTML = `
-            <div class="empty-state">
-                <i class="fas fa-shopping-cart"></i>
-                <h4>Cart is Empty</h4>
-                <p>Add products to get started</p>
-            </div>
-        `;
-        document.getElementById('generateBillBtn').disabled = true;
+    const button = document.getElementById('generateBillBtn');
+    if (!cartItems) return;
+
+    const settings = getSettings();
+    const symbol = settings.currencySymbol || '$';
+
+    if (!cart.length) {
+        cartItems.innerHTML = `<div class="empty-state"><i class="fas fa-shopping-cart"></i><h4>Cart is Empty</h4><p>Add products to get started</p></div>`;
+        if (button) button.disabled = true;
         return;
     }
-    
-    document.getElementById('generateBillBtn').disabled = false;
-    
+
+    if (button) button.disabled = false;
+    const products = getProducts();
+
     cartItems.innerHTML = cart.map((item, index) => {
-        const expiryDate = new Date(item.expiryDate);
-        const daysUntilExpiry = Math.floor((expiryDate - new Date()) / (1000 * 60 * 60 * 24));
-        
-        let expiryBadge = '';
-        if (daysUntilExpiry <= 7) {
-            expiryBadge = `<span class="badge badge-danger ms-2">Exp: ${daysUntilExpiry}d</span>`;
-        } else if (daysUntilExpiry <= 30) {
-            expiryBadge = `<span class="badge badge-warning ms-2">Exp: ${daysUntilExpiry}d</span>`;
-        }
-        
+        const product = products.find(p => String(p.id) === String(item.productId));
+        const available = product ? getProductAvailableStock(product) : 0;
+        const allocation = product ? previewAllocations(product, item.quantity) : {success:false, allocations:[]};
+        const estimated = allocation.success
+            ? allocation.allocations.reduce((sum, a) => sum + a.quantity * a.unitPrice, 0)
+            : 0;
+        const first = allocation.allocations[0];
+        const safe = typeof Utils.escapeHTML === 'function' ? Utils.escapeHTML : v => String(v ?? '');
+        const batchText = allocation.success
+            ? allocation.allocations.map(a => `${safe(a.batchNumber)} × ${a.quantity}`).join(', ')
+            : 'Stock changed — recheck at checkout';
+
         return `
             <div class="cart-item">
                 <div class="cart-item-info">
-                    <div class="cart-item-name">${item.productName}</div>
+                    <div class="cart-item-name">${safe(item.productName)}</div>
                     <div class="cart-item-details">
-                        Batch: ${item.batchNumber} ${expiryBadge}
-                        <br>${currencySymbol}${item.unitPrice} × ${item.quantity} = ${currencySymbol}${item.total.toFixed(2)}
+                        FEFO: ${batchText}
+                        <br>${symbol}${estimated.toFixed(2)} estimated · ${available} available
+                        ${first ? `<span class="badge badge-info ms-2">Earliest expiry ${safe(first.expiryDate)}</span>` : ''}
                     </div>
                 </div>
                 <div class="quantity-control">
-                    <button class="btn btn-sm btn-outline-secondary" onclick="updateQuantity(${index}, -1)">
-                        <i class="fas fa-minus"></i>
-                    </button>
-                    <input type="number" value="${item.quantity}" min="1" max="${item.maxStock}" 
-                           onchange="setQuantity(${index}, this.value)">
-                    <button class="btn btn-sm btn-outline-secondary" onclick="updateQuantity(${index}, 1)">
-                        <i class="fas fa-plus"></i>
-                    </button>
-                    <button class="btn btn-sm btn-danger" onclick="removeFromCart(${index})">
-                        <i class="fas fa-trash"></i>
-                    </button>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="updateQuantity(${index}, -1)" aria-label="Decrease quantity"><i class="fas fa-minus"></i></button>
+                    <input type="number" value="${item.quantity}" min="1" max="${available}" onchange="setQuantity(${index}, this.value)" aria-label="Quantity">
+                    <button class="btn btn-sm btn-outline-secondary" onclick="updateQuantity(${index}, 1)" aria-label="Increase quantity"><i class="fas fa-plus"></i></button>
+                    <button class="btn btn-sm btn-danger" onclick="removeFromCart(${index})" aria-label="Remove item"><i class="fas fa-trash"></i></button>
                 </div>
-            </div>
-        `;
+            </div>`;
     }).join('');
 }
 
-// Update quantity
 function updateQuantity(index, change) {
     const item = cart[index];
-    const newQuantity = item.quantity + change;
-    
-    if (newQuantity < 1) {
-        removeFromCart(index);
-        return;
-    }
-    
-    if (newQuantity > item.maxStock) {
-        Swal.fire({
-            icon: 'warning',
-            title: 'Stock Limit',
-            text: `Only ${item.maxStock} units available`,
-            confirmButtonColor: '#3b82f6'
-        });
-        return;
-    }
-    
-    item.quantity = newQuantity;
-    item.total = item.quantity * item.unitPrice;
-    
-    renderCart();
-    updateCartSummary();
+    if (!item) return;
+    const product = getProducts().find(p => String(p.id) === String(item.productId));
+    const max = product ? getProductAvailableStock(product) : 0;
+    const next = item.quantity + change;
+    if (next < 1) return removeFromCart(index);
+    if (next > max) return Swal.fire({icon:'warning', title:'Stock Limit', text:`Only ${max} non-expired units are available.`});
+    item.quantity = next;
+    persistCart(); renderCart(); updateCartSummary();
 }
 
-// Set quantity directly
 function setQuantity(index, value) {
     const item = cart[index];
-    const newQuantity = parseInt(value) || 1;
-    
-    if (newQuantity < 1) {
-        removeFromCart(index);
-        return;
+    if (!item) return;
+    const product = getProducts().find(p => String(p.id) === String(item.productId));
+    const max = product ? getProductAvailableStock(product) : 0;
+    const next = parseInt(value, 10);
+    if (!Number.isInteger(next) || next < 1) return removeFromCart(index);
+    if (next > max) {
+        Swal.fire({icon:'warning', title:'Stock Limit', text:`Only ${max} non-expired units are available.`});
+        renderCart(); return;
     }
-    
-    if (newQuantity > item.maxStock) {
-        Swal.fire({
-            icon: 'warning',
-            title: 'Stock Limit',
-            text: `Only ${item.maxStock} units available`,
-            confirmButtonColor: '#3b82f6'
-        });
-        renderCart();
-        return;
-    }
-    
-    item.quantity = newQuantity;
-    item.total = item.quantity * item.unitPrice;
-    
-    renderCart();
-    updateCartSummary();
+    item.quantity = next;
+    persistCart(); renderCart(); updateCartSummary();
 }
 
-// Remove from cart
 function removeFromCart(index) {
     cart.splice(index, 1);
-    renderCart();
-    updateCartSummary();
+    persistCart(); renderCart(); updateCartSummary();
 }
 
-// Clear cart
 function clearCart() {
-    if (cart.length === 0) return;
-    
+    if (!cart.length) return;
     Swal.fire({
-        title: 'Clear Cart',
-        text: 'Are you sure you want to clear all items from the cart?',
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#ef4444',
-        cancelButtonColor: '#6b7280',
-        confirmButtonText: 'Yes, clear it'
-    }).then((result) => {
+        title:'Clear Cart', text:'Remove all items from the current cart?', icon:'warning',
+        showCancelButton:true, confirmButtonColor:'#ef4444'
+    }).then(result => {
         if (result.isConfirmed) {
             cart = [];
-            renderCart();
-            updateCartSummary();
+            persistCart(); renderCart(); updateCartSummary();
         }
     });
 }
 
-// Update cart summary
+function getCartFinancials() {
+    const products = getProducts();
+    let subtotal = 0;
+    for (const item of cart) {
+        const product = products.find(p => String(p.id) === String(item.productId));
+        const allocation = product ? previewAllocations(product, item.quantity) : {success:false, allocations:[]};
+        if (allocation.success) subtotal += allocation.allocations.reduce((s,a) => s + a.quantity * a.unitPrice, 0);
+    }
+    const discount = parseFloat(document.getElementById('discountPercent')?.value) || 0;
+    const tax = Number(getSettings().defaultTax) || 0;
+    return Utils.calculateFinancials(subtotal, discount, tax);
+}
+
 function updateCartSummary() {
-    const settings = JSON.parse(localStorage.getItem('pharmacy_settings') || '{}');
-    const currencySymbol = settings.currencySymbol || '$';
-    
-    const subtotal = cart.reduce((sum, item) => sum + item.total, 0);
-    const discountPercent = parseFloat(document.getElementById('discountPercent').value) || 0;
-    
-    // Validate discount
-    if (discountPercent < 0 || discountPercent > 100) {
-        document.getElementById('discountPercent').value = 0;
-        return;
-    }
-    
-    const discountAmount = (subtotal * discountPercent) / 100;
-    const grandTotal = subtotal - discountAmount;
-    
-    document.getElementById('subtotal').textContent = currencySymbol + subtotal.toFixed(2);
-    document.getElementById('discountAmount').textContent = currencySymbol + discountAmount.toFixed(2);
-    document.getElementById('grandTotal').textContent = currencySymbol + grandTotal.toFixed(2);
+    const settings = getSettings();
+    const symbol = settings.currencySymbol || '$';
+    const financials = getCartFinancials();
+    document.getElementById('subtotal').textContent = symbol + financials.subtotal.toFixed(2);
+    document.getElementById('discountAmount').textContent = symbol + financials.discountAmount.toFixed(2);
+    document.getElementById('grandTotal').textContent = symbol + financials.grandTotal.toFixed(2);
 }
 
-// Generate bill
-function generateBill() {
-    if (cart.length === 0) {
-        Swal.fire({
-            icon: 'warning',
-            title: 'Empty Cart',
-            text: 'Please add products to cart first',
-            confirmButtonColor: '#3b82f6'
-        });
-        return;
-    }
-    
-    const settings = JSON.parse(localStorage.getItem('pharmacy_settings') || '{}');
-    const currentUser = JSON.parse(localStorage.getItem('pharmacy_current_user') || '{}');
-    const currencySymbol = settings.currencySymbol || '$';
-    
-    const customerName = document.getElementById('customerName').value || 'Walk-in Customer';
-    const customerPhone = document.getElementById('customerPhone').value || '-';
-    const doctorName = document.getElementById('doctorName').value || '-';
-    const prescriptionNumber = document.getElementById('prescriptionNumber').value || '-';
-    const paymentMethod = document.getElementById('paymentMethod').value;
-    
-    const subtotal = cart.reduce((sum, item) => sum + item.total, 0);
-    const discountPercent = parseFloat(document.getElementById('discountPercent').value) || 0;
-    const discountAmount = (subtotal * discountPercent) / 100;
-    const grandTotal = subtotal - discountAmount;
-    
-    // Generate invoice number
-    const nextInvoice = parseInt(localStorage.getItem('pharmacy_next_invoice') || '1');
-    const invoiceNumber = settings.invoicePrefix + '-' + String(nextInvoice).padStart(6, '0');
-    
-    const now = new Date();
-    
-    // Create invoice data
-    currentInvoiceData = {
-        invoiceNumber: invoiceNumber,
-        date: now.toISOString(),
-        customerName: customerName,
-        customerPhone: customerPhone,
-        doctorName: doctorName,
-        prescriptionNumber: prescriptionNumber,
-        cashier: currentUser.name,
-        items: [...cart],
-        subtotal: subtotal,
-        discount: discountPercent,
-        discountAmount: discountAmount,
-        grandTotal: grandTotal,
-        paymentMethod: paymentMethod
-    };
-    
-    // Generate invoice HTML
-    const invoiceContent = document.getElementById('invoiceContent');
-    
-    invoiceContent.innerHTML = `
-        <div id="printableInvoice" style="max-width: 800px; margin: 0 auto; font-family: 'Inter', sans-serif;">
-            <div style="text-align: center; border-bottom: 2px solid #000; padding-bottom: 20px; margin-bottom: 20px;">
-                <h2 style="margin: 0; color: #3b82f6; font-size: 32px;">
-                    <i class="fas fa-prescription-bottle-alt"></i> ${settings.pharmacyName}
-                </h2>
-                <p style="margin: 5px 0;">${settings.address}</p>
-                <p style="margin: 5px 0;">Phone: ${settings.phone} | Email: ${settings.email}</p>
-                ${settings.ntn ? `<p style="margin: 5px 0;">NTN: ${settings.ntn}</p>` : ''}
+function buildInvoicePreview(data) {
+    const settings = getSettings();
+    const symbol = settings.currencySymbol || '$';
+    const safe = typeof Utils.escapeHTML === 'function' ? Utils.escapeHTML : v => String(v ?? '');
+    const items = data.items || [];
+
+    return `
+        <div id="printableInvoice" class="invoice-paper">
+            <div class="text-center border-bottom pb-3 mb-3">
+                <h2>${safe(settings.pharmacyName || 'Pharmacy')}</h2>
+                <p>${safe(settings.address || '')}</p>
+                <p>Phone: ${safe(settings.phone || '')} | Email: ${safe(settings.email || '')}</p>
+                ${settings.ntn ? `<p>Registration/NTN: ${safe(settings.ntn)}</p>` : ''}
             </div>
-            
-            <div style="margin-bottom: 20px;">
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                    <div>
-                        <strong>Invoice #:</strong> ${invoiceNumber}<br>
-                        <strong>Date:</strong> ${now.toLocaleString()}<br>
-                        <strong>Cashier:</strong> ${currentUser.name}
-                    </div>
-                    <div>
-                        <strong>Customer:</strong> ${customerName}<br>
-                        <strong>Phone:</strong> ${customerPhone}<br>
-                        ${doctorName !== '-' ? `<strong>Doctor:</strong> ${doctorName}<br>` : ''}
-                        ${prescriptionNumber !== '-' ? `<strong>Prescription #:</strong> ${prescriptionNumber}` : ''}
-                    </div>
-                </div>
+            <div class="row mb-3">
+                <div class="col-6"><strong>Invoice #:</strong> ${safe(data.invoiceNumber)}<br><strong>Date:</strong> ${safe(new Date(data.date).toLocaleString())}<br><strong>Cashier:</strong> ${safe(data.cashier)}</div>
+                <div class="col-6"><strong>Customer:</strong> ${safe(data.customer.name)}<br><strong>Phone:</strong> ${safe(data.customer.phone)}</div>
             </div>
-            
-            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
-                <thead>
-                    <tr style="background: #f3f4f6; border-bottom: 2px solid #000;">
-                        <th style="padding: 10px; text-align: left;">Product</th>
-                        <th style="padding: 10px; text-align: center;">Batch</th>
-                        <th style="padding: 10px; text-align: center;">Qty</th>
-                        <th style="padding: 10px; text-align: right;">Price</th>
-                        <th style="padding: 10px; text-align: right;">Total</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${cart.map(item => `
-                        <tr style="border-bottom: 1px solid #e5e7eb;">
-                            <td style="padding: 10px;">${item.productName}</td>
-                            <td style="padding: 10px; text-align: center;">${item.batchNumber}</td>
-                            <td style="padding: 10px; text-align: center;">${item.quantity}</td>
-                            <td style="padding: 10px; text-align: right;">${currencySymbol}${item.unitPrice.toFixed(2)}</td>
-                            <td style="padding: 10px; text-align: right;">${currencySymbol}${item.total.toFixed(2)}</td>
-                        </tr>
-                    `).join('')}
-                </tbody>
+            <table class="table table-bordered">
+                <thead><tr><th>Product</th><th>Batch</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr></thead>
+                <tbody>${items.map(item => `<tr><td>${safe(item.productName)}</td><td>${safe(item.batchNumber)}</td><td>${item.quantity}</td><td>${symbol}${Number(item.unitPrice).toFixed(2)}</td><td>${symbol}${Number(item.subtotal).toFixed(2)}</td></tr>`).join('')}</tbody>
             </table>
-            
-            <div style="text-align: right; margin-bottom: 20px;">
-                <table style="margin-left: auto; width: 300px;">
-                    <tr>
-                        <td style="padding: 5px;"><strong>Subtotal:</strong></td>
-                        <td style="padding: 5px; text-align: right;">${currencySymbol}${subtotal.toFixed(2)}</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 5px;"><strong>Discount (${discountPercent}%):</strong></td>
-                        <td style="padding: 5px; text-align: right; color: #ef4444;">-${currencySymbol}${discountAmount.toFixed(2)}</td>
-                    </tr>
-                    <tr style="border-top: 2px solid #000; font-size: 18px;">
-                        <td style="padding: 10px 5px;"><strong>GRAND TOTAL:</strong></td>
-                        <td style="padding: 10px 5px; text-align: right;"><strong>${currencySymbol}${grandTotal.toFixed(2)}</strong></td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 5px;"><strong>Payment Method:</strong></td>
-                        <td style="padding: 5px; text-align: right;">${paymentMethod}</td>
-                    </tr>
-                </table>
+            <div class="text-end">
+                <div>Subtotal: ${symbol}${data.subtotal.toFixed(2)}</div>
+                <div>Discount (${data.discountPercent}%): -${symbol}${data.discountAmount.toFixed(2)}</div>
+                <div>Tax (${data.taxPercent}%): ${symbol}${data.taxAmount.toFixed(2)}</div>
+                <h4>Grand Total: ${symbol}${data.grandTotal.toFixed(2)}</h4>
+                <div>Payment: ${safe(data.paymentMethod)}</div>
             </div>
-            
-            <div style="text-align: center; border-top: 2px solid #000; padding-top: 20px; margin-top: 30px;">
-                <p style="margin: 0; font-style: italic;">Thank you for your purchase!</p>
-                <p style="margin: 5px 0; font-size: 12px;">This is a computer-generated invoice</p>
-            </div>
-        </div>
-    `;
-    
-    const modal = new bootstrap.Modal(document.getElementById('invoiceModal'));
-    modal.show();
+            <div class="text-center border-top pt-3 mt-3"><small>Thank you for your purchase.</small></div>
+        </div>`;
 }
 
-// Print invoice
+function generateBill() {
+    if (!cart.length) return Swal.fire({icon:'warning', title:'Empty Cart', text:'Please add products first.'});
+
+    const financials = getCartFinancials();
+    if (!financials.subtotal) return Swal.fire({icon:'error', title:'Stock Unavailable', text:'One or more cart items no longer have valid stock.'});
+
+    const settings = getSettings();
+    const user = getCurrentUser();
+    const nextInvoice = Number(Storage.get(STORAGE_KEYS.NEXT_INVOICE, 1));
+    const prefix = settings.invoicePrefix || 'INV';
+
+    currentInvoiceData = {
+        invoiceNumber: `${prefix}-${String(nextInvoice).padStart(6, '0')}`,
+        date: new Date().toISOString(),
+        cashier: user.name || 'Cashier',
+        customer: {
+            name: document.getElementById('customerName')?.value.trim() || 'Walk-in Customer',
+            phone: document.getElementById('customerPhone')?.value.trim() || '-',
+            doctorName: document.getElementById('doctorName')?.value.trim() || '-',
+            prescriptionNumber: document.getElementById('prescriptionNumber')?.value.trim() || '-'
+        },
+        items: [],
+        subtotal: financials.subtotal,
+        discountPercent: financials.discountPercent,
+        discountAmount: financials.discountAmount,
+        taxPercent: financials.taxPercent,
+        taxAmount: financials.taxAmount,
+        grandTotal: financials.grandTotal,
+        paymentMethod: document.getElementById('paymentMethod')?.value || 'Cash'
+    };
+
+    document.getElementById('invoiceContent').innerHTML = buildInvoicePreview(currentInvoiceData);
+    new bootstrap.Modal(document.getElementById('invoiceModal')).show();
+}
+
 function printInvoice() {
-    const printContent = document.getElementById('printableInvoice').cloneNode(true);
-    const printWindow = window.open('', '', 'width=800,height=600');
-    
-    printWindow.document.write(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Invoice - ${currentInvoiceData.invoiceNumber}</title>
-            <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-            <style>
-                body { font-family: 'Inter', Arial, sans-serif; padding: 20px; }
-                @media print {
-                    body { padding: 0; }
-                }
-            </style>
-        </head>
-        <body>
-            ${printContent.outerHTML}
-        </body>
-        </html>
-    `);
-    
+    const node = document.getElementById('printableInvoice');
+    if (!node || !currentInvoiceData) return;
+    const printWindow = window.open('', '', 'width=900,height=700');
+    if (!printWindow) return Swal.fire({icon:'warning', title:'Popup Blocked', text:'Allow popups to print the invoice.'});
+    printWindow.document.write(`<!doctype html><html><head><title>${currentInvoiceData.invoiceNumber}</title><link rel="stylesheet" href="css/print.css"></head><body>${node.outerHTML}</body></html>`);
     printWindow.document.close();
     printWindow.focus();
-    setTimeout(() => {
-        printWindow.print();
-        printWindow.close();
-    }, 250);
+    setTimeout(() => { printWindow.print(); printWindow.close(); }, 250);
 }
 
-// Confirm sale
 function confirmSale() {
-    // Validate stock availability
-    const products = JSON.parse(localStorage.getItem('pharmacy_products') || '[]');
-    
-    for (let cartItem of cart) {
-        const product = products.find(p => p.id === cartItem.productId);
-        if (!product) {
-            Swal.fire({
-                icon: 'error',
-                title: 'Error',
-                text: 'Product not found in inventory',
-                confirmButtonColor: '#3b82f6'
-            });
-            return;
+    const products = getProducts();
+    const allocationsByProduct = [];
+    const saleItems = [];
+
+    // Phase 1: validate everything and calculate allocations. No storage mutation.
+    for (const cartItem of cart) {
+        const product = products.find(p => String(p.id) === String(cartItem.productId));
+        if (!product) return Swal.fire({icon:'error', title:'Sale Blocked', text:`${cartItem.productName} no longer exists.`});
+        const allocation = previewAllocations(product, cartItem.quantity);
+        if (!allocation.success) {
+            return Swal.fire({icon:'error', title:'Sale Blocked', text:allocation.message});
         }
-        
-        const batch = product.batches.find(b => b.batchNumber === cartItem.batchNumber);
-        if (!batch || batch.quantity < cartItem.quantity) {
-            Swal.fire({
-                icon: 'error',
-                title: 'Insufficient Stock',
-                text: `Not enough stock for ${cartItem.productName}`,
-                confirmButtonColor: '#3b82f6'
+        allocationsByProduct.push({product, allocation});
+    }
+
+    const settings = getSettings();
+    const taxPercent = Number(settings.defaultTax) || 0;
+    const discountPercent = Number(currentInvoiceData?.discountPercent || 0);
+    const subtotal = allocationsByProduct.reduce((sum, x) => sum + x.allocation.allocations.reduce((s,a) => s + a.quantity*a.unitPrice,0), 0);
+    const financials = Utils.calculateFinancials(subtotal, discountPercent, taxPercent);
+
+    for (const {product, allocation} of allocationsByProduct) {
+        for (const a of allocation.allocations) {
+            const lineTotal = Number((a.quantity * a.unitPrice).toFixed(2));
+            saleItems.push({
+                productId: product.id,
+                productName: product.name,
+                batchId: a.batchId,
+                batchNumber: a.batchNumber,
+                quantity: a.quantity,
+                unitPrice: a.unitPrice,
+                purchasePrice: a.purchasePrice,
+                mrp: a.mrp,
+                expiryDate: a.expiryDate,
+                subtotal: lineTotal,
+                total: lineTotal,
+                unit: a.unit || 'Unit'
             });
-            return;
         }
     }
-    
-    // Deduct stock using FEFO
-    cart.forEach(cartItem => {
-        const product = products.find(p => p.id === cartItem.productId);
-        const batch = product.batches.find(b => b.batchNumber === cartItem.batchNumber);
-        batch.quantity -= cartItem.quantity;
-    });
-    
-    localStorage.setItem('pharmacy_products', JSON.stringify(products));
-    
-    // Save sale
-    const sales = JSON.parse(localStorage.getItem('pharmacy_sales') || '[]');
-    const nextSaleId = parseInt(localStorage.getItem('pharmacy_next_sale_id') || '1');
-    
-    const sale = {
-        id: nextSaleId,
+
+    const invoice = {
         ...currentInvoiceData,
-        status: 'Completed'
+        items: saleItems,
+        subtotal: financials.subtotal,
+        discountPercent: financials.discountPercent,
+        discount: financials.discountPercent,
+        discountAmount: financials.discountAmount,
+        taxPercent: financials.taxPercent,
+        taxAmount: financials.taxAmount,
+        grandTotal: financials.grandTotal
     };
-    
+
+    // Phase 2: apply all mutations to one in-memory snapshot, then commit together.
+    const productsSnapshot = JSON.parse(JSON.stringify(products));
+    for (const item of saleItems) {
+        const product = productsSnapshot.find(p => String(p.id) === String(item.productId));
+        const batch = (product.batches || []).find(b => String(b.id || b.batchNumber) === String(item.batchId) || b.batchNumber === item.batchNumber);
+        if (!batch || Number(batch.quantity) < item.quantity) {
+            return Swal.fire({icon:'error', title:'Sale Blocked', text:'Inventory changed while preparing the sale. Nothing was deducted.'});
+        }
+        batch.quantity = Number(batch.quantity) - item.quantity;
+        product.updatedAt = new Date().toISOString();
+    }
+
+    const sales = Storage.get(STORAGE_KEYS.SALES, []);
+    const nextSaleId = Number(Storage.get(STORAGE_KEYS.NEXT_SALE_ID, 1));
+    const sale = { id: nextSaleId, ...invoice, status:'Completed' };
     sales.push(sale);
-    localStorage.setItem('pharmacy_sales', JSON.stringify(sales));
-    localStorage.setItem('pharmacy_next_sale_id', (nextSaleId + 1).toString());
-    
-    // Increment invoice number
-    const nextInvoice = parseInt(localStorage.getItem('pharmacy_next_invoice') || '1');
-    localStorage.setItem('pharmacy_next_invoice', (nextInvoice + 1).toString());
-    
-    // Close modal
-    bootstrap.Modal.getInstance(document.getElementById('invoiceModal')).hide();
-    
-    // Show success message
-    Swal.fire({
-        icon: 'success',
-        title: 'Sale Completed',
-        html: `Invoice <strong>${currentInvoiceData.invoiceNumber}</strong> has been saved successfully!`,
-        confirmButtonColor: '#10b981',
-        timer: 3000
-    });
-    
-    // Clear cart and reset form
+
+    if (!Storage.set(STORAGE_KEYS.PRODUCTS, productsSnapshot)) return Swal.fire({icon:'error', title:'Save Failed', text:'Inventory could not be saved; sale was not recorded.'});
+    if (!Storage.set(STORAGE_KEYS.SALES, sales)) {
+        // Best-effort rollback of inventory if sale persistence fails.
+        Storage.set(STORAGE_KEYS.PRODUCTS, products);
+        return Swal.fire({icon:'error', title:'Save Failed', text:'Sale could not be recorded; inventory was restored.'});
+    }
+    Storage.set(STORAGE_KEYS.NEXT_SALE_ID, nextSaleId + 1);
+    Storage.set(STORAGE_KEYS.NEXT_INVOICE, Number(Storage.get(STORAGE_KEYS.NEXT_INVOICE, 1)) + 1);
+
+    bootstrap.Modal.getInstance(document.getElementById('invoiceModal'))?.hide();
+    Swal.fire({icon:'success', title:'Sale Completed', html:`Invoice <strong>${invoice.invoiceNumber}</strong> saved.`, timer:2500, showConfirmButton:false});
+
     cart = [];
-    document.getElementById('customerName').value = '';
-    document.getElementById('customerPhone').value = '';
-    document.getElementById('doctorName').value = '';
-    document.getElementById('prescriptionNumber').value = '';
-    document.getElementById('discountPercent').value = '0';
-    document.getElementById('posSearchInput').value = '';
-    
-    renderCart();
-    updateCartSummary();
-    searchProducts();
+    Storage.remove(STORAGE_KEYS.ACTIVE_CART);
+    ['customerName','customerPhone','doctorName','prescriptionNumber'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+    const discount = document.getElementById('discountPercent'); if (discount) discount.value='0';
+    const search = document.getElementById('posSearchInput'); if (search) search.value='';
+    renderCart(); updateCartSummary(); searchProducts();
 }
 
-// Initialize POS
 document.addEventListener('DOMContentLoaded', function() {
     if (!window.location.pathname.includes('pos')) return;
-    
+    cart = Storage.get(STORAGE_KEYS.ACTIVE_CART, []);
     renderCart();
     updateCartSummary();
-    
-    // Add search event listener
-    const searchInput = document.getElementById('posSearchInput');
-    if (searchInput) {
-        searchInput.addEventListener('input', searchProducts);
-    }
+    document.getElementById('posSearchInput')?.addEventListener('input', searchProducts);
+    document.getElementById('discountPercent')?.addEventListener('input', updateCartSummary);
 });

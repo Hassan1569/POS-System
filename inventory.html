@@ -192,11 +192,13 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="js/storage.js"></script>
+    <script src="js/utils.js"></script>
     <script src="app.js"></script>
     
     <script>
         function loadInventoryStats() {
-            const products = JSON.parse(localStorage.getItem('pharmacy_products') || '[]');
+            const products = Storage.get(STORAGE_KEYS.PRODUCTS, []);
             const now = new Date();
             
             let inStock = 0;
@@ -225,7 +227,7 @@
         }
 
         function loadLowStockProducts() {
-            const products = JSON.parse(localStorage.getItem('pharmacy_products') || '[]');
+            const products = Storage.get(STORAGE_KEYS.PRODUCTS, []);
             const tbody = document.getElementById('lowStockTableBody');
             const now = new Date();
             
@@ -269,10 +271,10 @@
         }
 
         function loadExpiringProducts() {
-            const products = JSON.parse(localStorage.getItem('pharmacy_products') || '[]');
+            const products = Storage.get(STORAGE_KEYS.PRODUCTS, []);
             const tbody = document.getElementById('expiringTableBody');
             const now = new Date();
-            const settings = JSON.parse(localStorage.getItem('pharmacy_settings') || '{}');
+            const settings = Storage.get(STORAGE_KEYS.SETTINGS, {});
             const warningDays = settings.expiryWarningDays || 30;
             
             const expiringBatches = [];
@@ -331,7 +333,7 @@
         }
 
         function loadOutOfStockProducts() {
-            const products = JSON.parse(localStorage.getItem('pharmacy_products') || '[]');
+            const products = Storage.get(STORAGE_KEYS.PRODUCTS, []);
             const tbody = document.getElementById('outOfStockTableBody');
             const now = new Date();
             

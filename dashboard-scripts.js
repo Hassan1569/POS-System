@@ -2,9 +2,9 @@
 
 // Calculate dashboard statistics
 function calculateDashboardStats() {
-    const products = JSON.parse(localStorage.getItem('pharmacy_products') || '[]');
-    const sales = JSON.parse(localStorage.getItem('pharmacy_sales') || '[]');
-    const settings = JSON.parse(localStorage.getItem('pharmacy_settings') || '{}');
+    const products = Storage.get(STORAGE_KEYS.PRODUCTS, []);
+    const sales = Storage.get(STORAGE_KEYS.SALES, []);
+    const settings = Storage.get(STORAGE_KEYS.SETTINGS, {});
     
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -13,6 +13,7 @@ function calculateDashboardStats() {
         totalProducts: products.length,
         totalStock: 0,
         lowStockCount: 0,
+        outOfStockCount: 0,
         expiringCount: 0,
         expiredCount: 0,
         todaySales: 0,
@@ -24,12 +25,14 @@ function calculateDashboardStats() {
     // Calculate product stats
     products.forEach(product => {
         let totalProductStock = 0;
+        let validProductStock = 0;
         let hasExpired = false;
         let isExpiringSoon = false;
         
         product.batches.forEach(batch => {
-            totalProductStock += batch.quantity;
-            stats.totalStock += batch.quantity;
+            totalProductStock += Number(batch.quantity) || 0;
+            if (Utils.calculateExpiryStatus(batch.expiryDate).status !== 'EXPIRED') validProductStock += Number(batch.quantity) || 0;
+            stats.totalStock += Number(batch.quantity) || 0;
             stats.inventoryValue += batch.quantity * batch.purchasePrice;
             
             const expiryDate = new Date(batch.expiryDate);
@@ -48,7 +51,9 @@ function calculateDashboardStats() {
             stats.expiringCount++;
         }
         
-        if (totalProductStock <= product.reorderLevel && totalProductStock > 0) {
+        if (validProductStock === 0) {
+            stats.outOfStockCount = (stats.outOfStockCount || 0) + 1;
+        } else if (validProductStock <= product.reorderLevel) {
             stats.lowStockCount++;
         }
         
@@ -64,7 +69,7 @@ function calculateDashboardStats() {
         const saleDate = new Date(sale.date);
         if (saleDate >= todayStart) {
             stats.todaySales++;
-            stats.todayRevenue += sale.grandTotal;
+            stats.todayRevenue += Number(sale.grandTotal) || 0;
         }
     });
     
@@ -74,7 +79,7 @@ function calculateDashboardStats() {
 // Update dashboard statistics
 function updateDashboardStats() {
     const stats = calculateDashboardStats();
-    const settings = JSON.parse(localStorage.getItem('pharmacy_settings') || '{}');
+    const settings = Storage.get(STORAGE_KEYS.SETTINGS, {});
     const currencySymbol = settings.currencySymbol || '$';
     
     // Update stat cards
@@ -91,8 +96,8 @@ function updateDashboardStats() {
 
 // Load recent sales
 function loadRecentSales() {
-    const sales = JSON.parse(localStorage.getItem('pharmacy_sales') || '[]');
-    const settings = JSON.parse(localStorage.getItem('pharmacy_settings') || '{}');
+    const sales = Storage.get(STORAGE_KEYS.SALES, []);
+    const settings = Storage.get(STORAGE_KEYS.SETTINGS, {});
     const currencySymbol = settings.currencySymbol || '$';
     const recentSalesList = document.getElementById('recentSalesList');
     
@@ -120,7 +125,7 @@ function loadRecentSales() {
             <div class="recent-sale-item">
                 <div class="recent-sale-info">
                     <h6>${sale.invoiceNumber}</h6>
-                    <small><i class="fas fa-user me-1"></i>${sale.customerName || 'Walk-in Customer'}</small>
+                    <small><i class="fas fa-user me-1"></i>${sale.customer?.name || sale.customerName || 'Walk-in Customer'}</small>
                     <small class="d-block"><i class="fas fa-clock me-1"></i>${timeAgo}</small>
                 </div>
                 <div class="recent-sale-amount">
@@ -197,7 +202,7 @@ function initializeSalesChart() {
 }
 
 function getSalesChartData(period) {
-    const sales = JSON.parse(localStorage.getItem('pharmacy_sales') || '[]');
+    const sales = Storage.get(STORAGE_KEYS.SALES, []);
     const now = new Date();
     
     if (period === 'daily') {
@@ -300,7 +305,7 @@ function initializeInventoryChart() {
     }
     
     const stats = calculateDashboardStats();
-    const products = JSON.parse(localStorage.getItem('pharmacy_products') || '[]');
+    const products = Storage.get(STORAGE_KEYS.PRODUCTS, []);
     
     const healthyStock = products.length - stats.lowStockCount - stats.expiringCount - stats.expiredCount;
     
@@ -343,7 +348,7 @@ function initializeCategoryChart() {
         categoryChart.destroy();
     }
     
-    const products = JSON.parse(localStorage.getItem('pharmacy_products') || '[]');
+    const products = Storage.get(STORAGE_KEYS.PRODUCTS, []);
     const categoryCount = {};
     
     products.forEach(product => {

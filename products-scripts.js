@@ -6,12 +6,12 @@ let filteredProducts = [];
 
 // Load products
 function loadProducts() {
-    const products = JSON.parse(localStorage.getItem('pharmacy_products') || '[]');
+    const products = Storage.get(STORAGE_KEYS.PRODUCTS, []);
     const searchTerm = document.getElementById('searchInput')?.value.toLowerCase() || '';
     const categoryFilter = document.getElementById('categoryFilter')?.value || '';
     const stockFilter = document.getElementById('stockFilter')?.value || '';
     const expiryFilter = document.getElementById('expiryFilter')?.value || '';
-    const settings = JSON.parse(localStorage.getItem('pharmacy_settings') || '{}');
+    const settings = Storage.get(STORAGE_KEYS.SETTINGS, {});
     const now = new Date();
 
     // Filter products
@@ -19,16 +19,18 @@ function loadProducts() {
         // Search filter
         const matchesSearch = !searchTerm || 
             product.name.toLowerCase().includes(searchTerm) ||
-            product.genericName.toLowerCase().includes(searchTerm) ||
-            product.brand.toLowerCase().includes(searchTerm) ||
-            product.sku.toLowerCase().includes(searchTerm) ||
-            product.barcode.includes(searchTerm);
+            String(product.genericName || '').toLowerCase().includes(searchTerm) ||
+            String(product.brand || '').toLowerCase().includes(searchTerm) ||
+            String(product.sku || '').toLowerCase().includes(searchTerm) ||
+            String(product.barcode || '').includes(searchTerm);
 
         // Category filter
         const matchesCategory = !categoryFilter || product.category === categoryFilter;
 
         // Calculate total stock
-        const totalStock = product.batches.reduce((sum, batch) => sum + batch.quantity, 0);
+        const totalStock = product.batches.reduce((sum, batch) => {
+            return sum + (Utils.isExpired(batch.expiryDate) ? 0 : Number(batch.quantity) || 0);
+        }, 0);
 
         // Stock filter
         let matchesStock = true;
@@ -62,7 +64,7 @@ function loadProducts() {
 // Render products table
 function renderProducts() {
     const tbody = document.getElementById('productsTableBody');
-    const settings = JSON.parse(localStorage.getItem('pharmacy_settings') || '{}');
+    const settings = Storage.get(STORAGE_KEYS.SETTINGS, {});
     const currencySymbol = settings.currencySymbol || '$';
     const now = new Date();
 
@@ -100,7 +102,9 @@ function renderProducts() {
             }
         });
 
-        const totalStock = product.batches.reduce((sum, batch) => sum + batch.quantity, 0);
+        const totalStock = product.batches.reduce((sum, batch) => {
+            return sum + (Utils.isExpired(batch.expiryDate) ? 0 : Number(batch.quantity) || 0);
+        }, 0);
         const daysUntilExpiry = Math.floor((earliestExpiry - now) / (1000 * 60 * 60 * 24));
 
         // Determine expiry status
@@ -125,7 +129,7 @@ function renderProducts() {
             stockBadge = '<span class="badge badge-success">In Stock</span>';
         }
 
-        const currentUser = JSON.parse(localStorage.getItem('pharmacy_current_user') || '{}');
+        const currentUser = Storage.get(STORAGE_KEYS.CURRENT_USER, {});
         const isAdmin = currentUser.role === 'admin';
 
         return `
@@ -211,11 +215,11 @@ function changePage(page) {
 
 // View product details
 function viewProduct(productId) {
-    const products = JSON.parse(localStorage.getItem('pharmacy_products') || '[]');
+    const products = Storage.get(STORAGE_KEYS.PRODUCTS, []);
     const product = products.find(p => p.id === productId);
     if (!product) return;
 
-    const settings = JSON.parse(localStorage.getItem('pharmacy_settings') || '{}');
+    const settings = Storage.get(STORAGE_KEYS.SETTINGS, {});
     const currencySymbol = settings.currencySymbol || '$';
     const now = new Date();
 
@@ -311,9 +315,9 @@ function deleteProduct(productId) {
         confirmButtonText: 'Yes, delete it'
     }).then((result) => {
         if (result.isConfirmed) {
-            let products = JSON.parse(localStorage.getItem('pharmacy_products') || '[]');
+            let products = Storage.get(STORAGE_KEYS.PRODUCTS, []);
             products = products.filter(p => p.id !== productId);
-            localStorage.setItem('pharmacy_products', JSON.stringify(products));
+            Storage.set(STORAGE_KEYS.PRODUCTS, products);
             
             Swal.fire({
                 icon: 'success',
@@ -345,7 +349,7 @@ function resetFilters() {
 
 // Load categories for filter
 function loadCategories() {
-    const categories = JSON.parse(localStorage.getItem('pharmacy_categories') || '[]');
+    const categories = Storage.get(STORAGE_KEYS.CATEGORIES, []);
     const categoryFilter = document.getElementById('categoryFilter');
     
     if (categoryFilter) {
@@ -360,7 +364,7 @@ function loadCategories() {
 
 // Check if user is admin and show add button
 function checkAdminAccess() {
-    const currentUser = JSON.parse(localStorage.getItem('pharmacy_current_user') || '{}');
+    const currentUser = Storage.get(STORAGE_KEYS.CURRENT_USER, {});
     const addProductButton = document.getElementById('addProductButton');
     
     if (addProductButton && currentUser.role === 'admin') {

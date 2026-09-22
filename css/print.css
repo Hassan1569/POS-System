@@ -1,0 +1,121 @@
+/**
+ * PharmaCare - Dedicated Print Stylesheet
+ * Ensures clean, professional invoice and report printing with zero navigation or UI clutter.
+ */
+
+@media print {
+    /* Hide all application chrome and navigation */
+    .sidebar,
+    #sidebar,
+    .topbar,
+    .modal-backdrop,
+    .modal-header .btn-close,
+    .modal-footer,
+    .btn,
+    button,
+    .page-header a,
+    .page-header button,
+    .nav-tabs,
+    .card-header-tabs,
+    .pagination,
+    #notificationMenu,
+    .dropdown-menu {
+        display: none !important;
+    }
+
+    /* Reset layouts for clean page printing */
+    body, html {
+        background: #ffffff !important;
+        color: #000000 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        font-family: 'Inter', Arial, sans-serif !important;
+        font-size: 12pt !important;
+        width: 100% !important;
+    }
+
+    .main-content {
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+    }
+
+    .page-content {
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    .modal {
+        position: static !important;
+        display: block !important;
+        overflow: visible !important;
+        padding: 0 !important;
+        background: none !important;
+    }
+
+    .modal-dialog {
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    .modal-content {
+        border: none !important;
+        box-shadow: none !important;
+        background: transparent !important;
+    }
+
+    .modal-body {
+        padding: 0 !important;
+    }
+
+    .card {
+        border: none !important;
+        box-shadow: none !important;
+    }
+
+    /* Printable containers */
+    #printableInvoice,
+    #printableSaleInvoice,
+    .printable-receipt {
+        display: block !important;
+        width: 100% !important;
+        max-width: 800px !important;
+        margin: 0 auto !important;
+        padding: 15px !important;
+        color: #000000 !important;
+    }
+
+    /* Tables formatting in print */
+    table {
+        width: 100% !important;
+        border-collapse: collapse !important;
+        page-break-inside: auto !important;
+    }
+
+    tr {
+        page-break-inside: avoid !important;
+        page-break-after: auto !important;
+    }
+
+    thead {
+        display: table-header-group !important;
+    }
+
+    th, td {
+        border-color: #333333 !important;
+        color: #000000 !important;
+    }
+
+    /* Badges */
+    .badge {
+        border: 1px solid #333 !important;
+        color: #000 !important;
+        background: transparent !important;
+    }
+
+    /* Link URLs suppressed */
+    a[href]:after {
+        content: none !important;
+    }
+}

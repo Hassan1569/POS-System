@@ -303,37 +303,16 @@
     
     <!-- SweetAlert2 -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <!-- PharmaCare Modules (must be loaded before inline script) -->
+    <script src="js/storage.js"></script>
+    <script src="js/utils.js"></script>
     
     <script>
-        // Initialize LocalStorage with default data if empty
+        // Initialize LocalStorage with full default dataset via Storage module
         function initializeApp() {
-            if (!localStorage.getItem('pharmacy_initialized')) {
-                // Initialize users
-                const users = [
-                    {
-                        id: 1,
-                        name: 'Admin User',
-                        email: 'admin@pharmacy.com',
-                        password: 'admin123',
-                        role: 'admin',
-                        phone: '+1234567890',
-                        active: true,
-                        createdAt: new Date().toISOString()
-                    },
-                    {
-                        id: 2,
-                        name: 'Shop Keeper',
-                        email: 'shopkeeper@pharmacy.com',
-                        password: 'shop123',
-                        role: 'shopkeeper',
-                        phone: '+1234567891',
-                        active: true,
-                        createdAt: new Date().toISOString()
-                    }
-                ];
-                
-                localStorage.setItem('pharmacy_users', JSON.stringify(users));
-                localStorage.setItem('pharmacy_initialized', 'true');
+            if (typeof Storage !== 'undefined' && typeof Storage.init === 'function') {
+                Storage.init();
             }
         }
 
@@ -367,7 +346,7 @@
             const password = document.getElementById('password').value;
             const rememberMe = document.getElementById('rememberMe').checked;
             
-            const users = JSON.parse(localStorage.getItem('pharmacy_users') || '[]');
+            const users = Storage.get(STORAGE_KEYS.USERS, []);
             const user = users.find(u => u.email === email && u.password === password);
             
             if (user) {
@@ -392,7 +371,7 @@
                     rememberMe: rememberMe
                 };
                 
-                localStorage.setItem('pharmacy_current_user', JSON.stringify(currentUser));
+                Storage.set(STORAGE_KEYS.CURRENT_USER, currentUser);
                 
                 Swal.fire({
                     icon: 'success',
@@ -417,7 +396,7 @@
         initializeApp();
 
         // Check if already logged in
-        const currentUser = localStorage.getItem('pharmacy_current_user');
+        const currentUser = Storage.get(STORAGE_KEYS.CURRENT_USER, null);
         if (currentUser) {
             window.location.href = 'dashboard.html';
         }

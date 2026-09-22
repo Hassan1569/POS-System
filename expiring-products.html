@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Expiring Soon - PharmaCare</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <i class="fas fa-prescription-bottle-alt"></i>
+            <span>PharmaCare</span>
+        </div>
+        <div class="sidebar-menu" id="sidebarMenu"></div>
+    </div>
+
+    <div class="main-content">
+        <nav class="topbar">
+            <button class="btn btn-link sidebar-toggle" id="sidebarToggle"><i class="fas fa-bars"></i></button>
+            <div class="topbar-right">
+                <div class="dropdown notification-dropdown">
+                    <button class="btn btn-link notification-btn" type="button" data-bs-toggle="dropdown">
+                        <i class="fas fa-bell"></i>
+                        <span class="notification-badge" id="notificationBadge">0</span>
+                    </button>
+                    <div class="dropdown-menu dropdown-menu-end notification-menu" id="notificationMenu">
+                        <div class="notification-header"><h6>Notifications</h6></div>
+                        <div class="notification-list" id="notificationList"></div>
+                    </div>
+                </div>
+                <div class="dropdown user-dropdown">
+                    <button class="btn btn-link user-btn" type="button" data-bs-toggle="dropdown">
+                        <div class="user-avatar"><i class="fas fa-user"></i></div>
+                        <div class="user-info">
+                            <span class="user-name" id="userName">User</span>
+                            <small class="user-role" id="userRole">Role</small>
+                        </div>
+                        <i class="fas fa-chevron-down ms-2"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item" href="#" onclick="logout()"><i class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
+
+        <div class="page-content">
+            <div class="page-header">
+                <div>
+                    <h1><i class="fas fa-clock me-2 text-warning"></i>Expiring Soon</h1>
+                    <p class="text-muted">Monitor batches approaching their expiry dates</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <select class="form-select" id="filterDays" onchange="loadExpiringProducts()">
+                        <option value="7">Within 7 days (Critical)</option>
+                        <option value="30" selected>Within 30 days (Warning)</option>
+                        <option value="60">Within 60 days</option>
+                        <option value="90">Within 90 days</option>
+                    </select>
+                    <a href="products.html" class="btn btn-outline-primary">
+                        <i class="fas fa-pills me-2"></i>All Products
+                    </a>
+                </div>
+            </div>
+
+            <div class="row g-4 mb-4">
+                <div class="col-md-3">
+                    <div class="stat-card">
+                        <div class="stat-info"><h3 id="criticalCount">0</h3><p>Critical (=7 days)</p></div>
+                        <div class="stat-icon" style="background:linear-gradient(135deg,#ef4444,#b91c1c);"><i class="fas fa-exclamation-triangle"></i></div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stat-card">
+                        <div class="stat-info"><h3 id="warningCount">0</h3><p>Warning (8-30 days)</p></div>
+                        <div class="stat-icon" style="background:linear-gradient(135deg,#f59e0b,#d97706);"><i class="fas fa-clock"></i></div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stat-card">
+                        <div class="stat-info"><h3 id="totalBatchesExpiring">0</h3><p>Total Batches Expiring</p></div>
+                        <div class="stat-icon" style="background:linear-gradient(135deg,#8b5cf6,#6d28d9);"><i class="fas fa-boxes"></i></div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stat-card">
+                        <div class="stat-info"><h3 id="totalUnitsExpiring">0</h3><p>Units at Risk</p></div>
+                        <div class="stat-icon" style="background:linear-gradient(135deg,#3b82f6,#1d4ed8);"><i class="fas fa-pills"></i></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5><i class="fas fa-list me-2"></i>Expiring Batches</h5>
+                    <div class="input-group" style="max-width:280px;">
+                        <span class="input-group-text"><i class="fas fa-search"></i></span>
+                        <input type="text" class="form-control" id="searchInput" placeholder="Search products..." oninput="loadExpiringProducts()">
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Product</th>
+                                    <th>Category</th>
+                                    <th>Batch No.</th>
+                                    <th>Expiry Date</th>
+                                    <th>Days Left</th>
+                                    <th>Qty in Batch</th>
+                                    <th>Selling Price</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="expiringTableBody">
+                                <tr><td colspan="8" class="text-center"><div class="spinner-border text-primary" role="status"></div></td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="mt-2"><small class="text-muted">Showing <span id="showingCount">0</span> batches</small></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="js/storage.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="app.js"></script>
+    <script>
+        function loadExpiringProducts() {
+            const products = Storage.get(STORAGE_KEYS.PRODUCTS, []);
+            const settings = Storage.get(STORAGE_KEYS.SETTINGS, {});
+            const currencySymbol = settings.currencySymbol || '$';
+            const filterDays = parseInt(document.getElementById('filterDays').value);
+            const search = document.getElementById('searchInput').value.toLowerCase().trim();
+            const now = new Date(); now.setHours(0,0,0,0);
+            const criticalDays = parseInt(settings.criticalExpiryDays) || 7;
+
+            let allExpiring = [];
+            let criticalCount = 0;
+            let warningCount = 0;
+            let totalUnits = 0;
+
+            products.forEach(product => {
+                if (search && !product.name.toLowerCase().includes(search) && !product.genericName.toLowerCase().includes(search)) return;
+                (product.batches || []).forEach(batch => {
+                    const exp = new Date(batch.expiryDate); exp.setHours(23,59,59,999);
+                    const daysLeft = Math.ceil((exp - now) / 86400000);
+                    if (daysLeft >= 0 && daysLeft <= filterDays && Number(batch.quantity) > 0) {
+                        allExpiring.push({ product, batch, daysLeft });
+                        if (daysLeft <= criticalDays) criticalCount++;
+                        else warningCount++;
+                        totalUnits += Number(batch.quantity);
+                    }
+                });
+            });
+
+            allExpiring.sort((a,b) => a.daysLeft - b.daysLeft);
+
+            document.getElementById('criticalCount').textContent = criticalCount;
+            document.getElementById('warningCount').textContent = warningCount;
+            document.getElementById('totalBatchesExpiring').textContent = allExpiring.length;
+            document.getElementById('totalUnitsExpiring').textContent = totalUnits.toLocaleString();
+            document.getElementById('showingCount').textContent = allExpiring.length;
+
+            const tbody = document.getElementById('expiringTableBody');
+            if (allExpiring.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><i class="fas fa-check-circle" style="color:#10b981;"></i><h4>No Expiring Batches</h4><p>No products expiring within the selected timeframe</p></div></td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = allExpiring.map(({ product, batch, daysLeft }) => {
+                let statusBadge, rowClass = '';
+                if (daysLeft <= criticalDays) {
+                    statusBadge = `<span class="badge bg-danger">Critical - ${daysLeft}d</span>`;
+                    rowClass = 'table-danger';
+                } else if (daysLeft <= 30) {
+                    statusBadge = `<span class="badge bg-warning text-dark">Warning - ${daysLeft}d</span>`;
+                    rowClass = 'table-warning';
+                } else {
+                    statusBadge = `<span class="badge bg-info text-dark">Notice - ${daysLeft}d</span>`;
+                }
+                return `<tr class="${rowClass}">
+                    <td><strong>${product.name}</strong><br><small class="text-muted">${product.genericName}</small></td>
+                    <td><span class="badge bg-secondary">${product.category || 'Uncategorized'}</span></td>
+                    <td>${batch.batchNumber}</td>
+                    <td>${new Date(batch.expiryDate).toLocaleDateString()}</td>
+                    <td><strong>${daysLeft}</strong> days</td>
+                    <td>${Number(batch.quantity).toLocaleString()} ${batch.unit || 'units'}</td>
+                    <td>${currencySymbol}${Number(batch.sellingPrice).toFixed(2)}</td>
+                    <td>${statusBadge}</td>
+                </tr>`;
+            }).join('');
+        }
+
+        document.addEventListener('DOMContentLoaded', loadExpiringProducts);
+    </script>
+</body>
+</html>

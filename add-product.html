@@ -237,6 +237,8 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="js/storage.js"></script>
+    <script src="js/utils.js"></script>
     <script src="app.js"></script>
     
     <script>
@@ -244,7 +246,7 @@
         let editProductId = null;
 
         function loadCategories() {
-            const categories = JSON.parse(localStorage.getItem('pharmacy_categories') || '[]');
+            const categories = Storage.get(STORAGE_KEYS.CATEGORIES, []);
             const categorySelect = document.getElementById('category');
             
             categorySelect.innerHTML = '<option value="">Select Category</option>';
@@ -266,7 +268,7 @@
         }
 
         function loadProductForEdit(productId) {
-            const products = JSON.parse(localStorage.getItem('pharmacy_products') || '[]');
+            const products = Storage.get(STORAGE_KEYS.PRODUCTS, []);
             const product = products.find(p => p.id === productId);
             
             if (!product) {
@@ -356,91 +358,97 @@
         });
 
         function saveProduct() {
-            const products = JSON.parse(localStorage.getItem('pharmacy_products') || '[]');
-            
+            const products = Storage.get(STORAGE_KEYS.PRODUCTS, []);
+            const normalize = value => String(value || '').trim().toLowerCase();
+            const sku = document.getElementById('sku').value.trim();
+            const barcode = document.getElementById('barcode').value.trim();
+            const duplicateSku = products.some(p => normalize(p.sku) === normalize(sku) && (!editMode || p.id !== editProductId));
+            const duplicateBarcode = barcode && products.some(p => normalize(p.barcode) === normalize(barcode) && (!editMode || p.id !== editProductId));
+
+            if (duplicateSku) return Swal.fire({icon:'error', title:'Duplicate SKU', text:'Another product already uses this SKU.'});
+            if (duplicateBarcode) return Swal.fire({icon:'error', title:'Duplicate Barcode', text:'Another product already uses this barcode.'});
+
+            const quantity = Number(document.getElementById('quantity').value);
+            const purchasePrice = Number(document.getElementById('purchasePrice').value);
+            const sellingPrice = Number(document.getElementById('sellingPrice').value);
+            const mrp = Number(document.getElementById('mrp').value);
+            const discount = Number(document.getElementById('tax').value);
+            const minStock = Number(document.getElementById('minStock').value);
+            const reorderLevel = Number(document.getElementById('reorderLevel').value);
+            if (![quantity,purchasePrice,sellingPrice,mrp,minStock,reorderLevel].every(Number.isFinite) || quantity < 0 || purchasePrice < 0 || sellingPrice <= 0 || mrp < sellingPrice || minStock < 0 || reorderLevel < 0) {
+                return Swal.fire({icon:'error', title:'Invalid Values', text:'Check quantity, stock levels and prices before saving.'});
+            }
+
+            const formBatch = {
+                id: editMode ? undefined : Utils.generateId('batch'),
+                batchNumber: document.getElementById('batchNumber').value.trim(),
+                quantity,
+                purchasePrice,
+                sellingPrice,
+                mrp,
+                tax: Number.isFinite(discount) ? Math.max(0, Math.min(100, discount)) : 0,
+                manufacturingDate: document.getElementById('manufacturingDate').value,
+                expiryDate: document.getElementById('expiryDate').value,
+                unit: document.getElementById('unit').value
+            };
+
             const productData = {
-                name: document.getElementById('productName').value,
-                genericName: document.getElementById('genericName').value,
-                brand: document.getElementById('brandName').value,
-                sku: document.getElementById('sku').value,
-                barcode: document.getElementById('barcode').value || '',
+                name: document.getElementById('productName').value.trim(),
+                genericName: document.getElementById('genericName').value.trim(),
+                brand: document.getElementById('brandName').value.trim(),
+                sku,
+                barcode,
                 category: document.getElementById('category').value,
                 type: document.getElementById('productType').value,
-                manufacturer: document.getElementById('manufacturer').value,
-                description: document.getElementById('description').value,
+                manufacturer: document.getElementById('manufacturer').value.trim(),
+                description: document.getElementById('description').value.trim(),
                 prescriptionRequired: document.getElementById('prescriptionRequired').value === 'true',
-                supplier: document.getElementById('supplier').value,
-                supplierContact: document.getElementById('supplierContact').value,
-                storageInstructions: document.getElementById('storageInstructions').value,
-                batches: [
-                    {
-                        batchNumber: document.getElementById('batchNumber').value,
-                        quantity: parseInt(document.getElementById('quantity').value),
-                        purchasePrice: parseFloat(document.getElementById('purchasePrice').value),
-                        sellingPrice: parseFloat(document.getElementById('sellingPrice').value),
-                        mrp: parseFloat(document.getElementById('mrp').value),
-                        tax: parseFloat(document.getElementById('tax').value),
-                        manufacturingDate: document.getElementById('manufacturingDate').value,
-                        expiryDate: document.getElementById('expiryDate').value,
-                        unit: document.getElementById('unit').value
-                    }
-                ],
-                minStock: parseInt(document.getElementById('minStock').value),
-                reorderLevel: parseInt(document.getElementById('reorderLevel').value),
+                supplier: document.getElementById('supplier').value.trim(),
+                supplierContact: document.getElementById('supplierContact').value.trim(),
+                storageInstructions: document.getElementById('storageInstructions').value.trim(),
+                minStock,
+                reorderLevel,
                 updatedAt: new Date().toISOString()
             };
 
             if (editMode) {
-                // Update existing product
-                const productIndex = products.findIndex(p => p.id === editProductId);
-                if (productIndex !== -1) {
-                    products[productIndex] = {
-                        ...products[productIndex],
-                        ...productData
-                    };
-                }
-                
-                localStorage.setItem('pharmacy_products', JSON.stringify(products));
-                
-                Swal.fire({
-                    icon: 'success',
-                    title: 'Product Updated',
-                    text: 'Product has been updated successfully',
-                    timer: 2000,
-                    showConfirmButton: false
-                }).then(() => {
-                    window.location.href = 'products.html';
-                });
+                const product = products.find(p => p.id === editProductId);
+                if (!product) return Swal.fire({icon:'error', title:'Product Not Found', text:'The product no longer exists.'});
+
+                // Preserve every existing batch. The form edits the first batch instead of silently deleting the others.
+                const existingFirst = product.batches?.[0];
+                formBatch.id = existingFirst?.id || Utils.generateId('batch');
+                productData.batches = Array.isArray(product.batches) && product.batches.length
+                    ? [{...existingFirst, ...formBatch}, ...product.batches.slice(1)]
+                    : [formBatch];
+                Object.assign(product, productData);
+                Storage.set(STORAGE_KEYS.PRODUCTS, products);
             } else {
-                // Add new product
-                const nextId = parseInt(localStorage.getItem('pharmacy_next_product_id') || '1');
-                
-                const newProduct = {
+                const nextId = Number(Storage.get(STORAGE_KEYS.NEXT_PRODUCT_ID, 1));
+                formBatch.id = formBatch.id || Utils.generateId('batch');
+                products.push({
                     id: nextId,
                     ...productData,
+                    batches: [formBatch],
                     createdAt: new Date().toISOString()
-                };
-                
-                products.push(newProduct);
-                localStorage.setItem('pharmacy_products', JSON.stringify(products));
-                localStorage.setItem('pharmacy_next_product_id', (nextId + 1).toString());
-                
-                Swal.fire({
-                    icon: 'success',
-                    title: 'Product Added',
-                    text: 'Product has been added successfully',
-                    timer: 2000,
-                    showConfirmButton: false
-                }).then(() => {
-                    window.location.href = 'products.html';
                 });
+                Storage.set(STORAGE_KEYS.PRODUCTS, products);
+                Storage.set(STORAGE_KEYS.NEXT_PRODUCT_ID, nextId + 1);
             }
+
+            Swal.fire({
+                icon:'success',
+                title: editMode ? 'Product Updated' : 'Product Added',
+                text: editMode ? 'Product details were saved without removing other batches.' : 'Product has been added successfully.',
+                timer:1800,
+                showConfirmButton:false
+            }).then(() => { window.location.href='products.html'; });
         }
 
         document.addEventListener('DOMContentLoaded', function() {
             if (!window.location.pathname.includes('add-product')) return;
             
-            const currentUser = JSON.parse(localStorage.getItem('pharmacy_current_user') || '{}');
+            const currentUser = Storage.get(STORAGE_KEYS.CURRENT_USER, {});
             if (currentUser.role !== 'admin') {
                 window.location.href = 'dashboard.html';
                 return;

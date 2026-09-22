@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Categories - PharmaCare</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <i class="fas fa-prescription-bottle-alt"></i>
+            <span>PharmaCare</span>
+        </div>
+        <div class="sidebar-menu" id="sidebarMenu"></div>
+    </div>
+
+    <div class="main-content">
+        <nav class="topbar">
+            <button class="btn btn-link sidebar-toggle" id="sidebarToggle"><i class="fas fa-bars"></i></button>
+            <div class="topbar-right">
+                <div class="dropdown notification-dropdown">
+                    <button class="btn btn-link notification-btn" type="button" data-bs-toggle="dropdown">
+                        <i class="fas fa-bell"></i>
+                        <span class="notification-badge" id="notificationBadge">0</span>
+                    </button>
+                    <div class="dropdown-menu dropdown-menu-end notification-menu" id="notificationMenu">
+                        <div class="notification-header"><h6>Notifications</h6></div>
+                        <div class="notification-list" id="notificationList"></div>
+                    </div>
+                </div>
+                <div class="dropdown user-dropdown">
+                    <button class="btn btn-link user-btn" type="button" data-bs-toggle="dropdown">
+                        <div class="user-avatar"><i class="fas fa-user"></i></div>
+                        <div class="user-info">
+                            <span class="user-name" id="userName">User</span>
+                            <small class="user-role" id="userRole">Role</small>
+                        </div>
+                        <i class="fas fa-chevron-down ms-2"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item" href="#" onclick="logout()"><i class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
+
+        <div class="page-content">
+            <div class="page-header">
+                <div>
+                    <h1><i class="fas fa-tags me-2"></i>Product Categories</h1>
+                    <p class="text-muted">Manage product categories for better inventory organization</p>
+                </div>
+                <button class="btn btn-primary" onclick="showAddCategoryModal()">
+                    <i class="fas fa-plus me-2"></i>Add Category
+                </button>
+            </div>
+
+            <div class="row g-4 mb-4">
+                <div class="col-md-3">
+                    <div class="stat-card">
+                        <div class="stat-info"><h3 id="totalCategoriesCount">0</h3><p>Total Categories</p></div>
+                        <div class="stat-icon" style="background:linear-gradient(135deg,#3b82f6,#1d4ed8);"><i class="fas fa-tags"></i></div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stat-card">
+                        <div class="stat-info"><h3 id="categoriesWithProductsCount">0</h3><p>With Products</p></div>
+                        <div class="stat-icon" style="background:linear-gradient(135deg,#10b981,#059669);"><i class="fas fa-check-circle"></i></div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stat-card">
+                        <div class="stat-info"><h3 id="emptyCategoriesCount">0</h3><p>Empty Categories</p></div>
+                        <div class="stat-icon" style="background:linear-gradient(135deg,#f59e0b,#d97706);"><i class="fas fa-folder-open"></i></div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stat-card">
+                        <div class="stat-info"><h3 id="totalProductsInCats">0</h3><p>Total Products</p></div>
+                        <div class="stat-icon" style="background:linear-gradient(135deg,#8b5cf6,#6d28d9);"><i class="fas fa-pills"></i></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5><i class="fas fa-list me-2"></i>All Categories</h5>
+                    <div class="input-group" style="max-width:280px;">
+                        <span class="input-group-text"><i class="fas fa-search"></i></span>
+                        <input type="text" class="form-control" id="categorySearch" placeholder="Search categories..." oninput="renderCategories()">
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3" id="categoriesGrid"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="categoryModal" tabindex="-1">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="categoryModalTitle"><i class="fas fa-tag me-2"></i>Add Category</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="editingCategoryIndex" value="">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Category Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="categoryNameInput" placeholder="e.g. Antibiotics" maxlength="50">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="saveCategory()"><i class="fas fa-save me-2"></i>Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="js/storage.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="app.js"></script>
+    <script>
+        function getProductCount(cat, products) { return products.filter(p => p.category === cat).length; }
+
+        function renderCategories() {
+            const categories = Storage.get(STORAGE_KEYS.CATEGORIES, []);
+            const products = Storage.get(STORAGE_KEYS.PRODUCTS, []);
+            const search = document.getElementById('categorySearch').value.toLowerCase().trim();
+            const filtered = categories.filter(c => c.toLowerCase().includes(search));
+            const grid = document.getElementById('categoriesGrid');
+            if (filtered.length === 0) {
+                grid.innerHTML = '<div class="col-12"><div class="empty-state"><i class="fas fa-tags"></i><h4>No Categories</h4><p>Add a category to get started</p></div></div>';
+                return;
+            }
+            grid.innerHTML = filtered.map(cat => {
+                const realIdx = categories.indexOf(cat);
+                const count = getProductCount(cat, products);
+                return `<div class="col-md-4 col-lg-3">
+                    <div class="card h-100 border-0 shadow-sm" style="transition:transform 0.2s;cursor:default;"
+                         onmouseover="this.style.transform='translateY(-3px)'" onmouseout="this.style.transform='translateY(0)'">
+                        <div class="card-body text-center py-4">
+                            <div style="width:60px;height:60px;background:linear-gradient(135deg,#3b82f6,#8b5cf6);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 15px;">
+                                <i class="fas fa-tag text-white fs-5"></i>
+                            </div>
+                            <h6 class="fw-bold mb-1">${cat}</h6>
+                            <span class="badge ${count > 0 ? 'bg-success' : 'bg-secondary'} mb-3">${count} product${count!==1?'s':''}</span>
+                            <div class="d-flex justify-content-center gap-2">
+                                <button class="btn btn-sm btn-outline-primary" onclick="editCategory(${realIdx})"><i class="fas fa-edit"></i></button>
+                                <button class="btn btn-sm btn-outline-danger" onclick="deleteCategory(${realIdx},'${cat.replace(/'/g,"\\'")}',${count})"><i class="fas fa-trash"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function updateStats() {
+            const cats = Storage.get(STORAGE_KEYS.CATEGORIES, []);
+            const prods = Storage.get(STORAGE_KEYS.PRODUCTS, []);
+            const withProds = cats.filter(c => getProductCount(c, prods) > 0).length;
+            document.getElementById('totalCategoriesCount').textContent = cats.length;
+            document.getElementById('categoriesWithProductsCount').textContent = withProds;
+            document.getElementById('emptyCategoriesCount').textContent = cats.length - withProds;
+            document.getElementById('totalProductsInCats').textContent = prods.length;
+        }
+
+        function showAddCategoryModal() {
+            document.getElementById('categoryModalTitle').innerHTML = '<i class="fas fa-plus me-2"></i>Add Category';
+            document.getElementById('categoryNameInput').value = '';
+            document.getElementById('editingCategoryIndex').value = '';
+            new bootstrap.Modal(document.getElementById('categoryModal')).show();
+        }
+
+        function editCategory(index) {
+            const cats = Storage.get(STORAGE_KEYS.CATEGORIES, []);
+            document.getElementById('categoryModalTitle').innerHTML = '<i class="fas fa-edit me-2"></i>Edit Category';
+            document.getElementById('categoryNameInput').value = cats[index];
+            document.getElementById('editingCategoryIndex').value = index;
+            new bootstrap.Modal(document.getElementById('categoryModal')).show();
+        }
+
+        function saveCategory() {
+            const name = document.getElementById('categoryNameInput').value.trim();
+            if (!name) { Swal.fire({ icon:'warning', title:'Required', text:'Please enter a category name.', confirmButtonColor:'#3b82f6' }); return; }
+            const cats = Storage.get(STORAGE_KEYS.CATEGORIES, []);
+            const editIdx = document.getElementById('editingCategoryIndex').value;
+            if (editIdx !== '') {
+                const idx = parseInt(editIdx);
+                const oldName = cats[idx];
+                if (cats.some((c,i) => c.toLowerCase()===name.toLowerCase() && i!==idx)) {
+                    Swal.fire({ icon:'error', title:'Duplicate', text:'Category already exists.', confirmButtonColor:'#3b82f6' }); return;
+                }
+                cats[idx] = name;
+                const prods = Storage.get(STORAGE_KEYS.PRODUCTS, []);
+                prods.forEach(p => { if(p.category===oldName) p.category=name; });
+                Storage.set(STORAGE_KEYS.PRODUCTS, prods);
+            } else {
+                if (cats.some(c => c.toLowerCase()===name.toLowerCase())) {
+                    Swal.fire({ icon:'error', title:'Duplicate', text:'Category already exists.', confirmButtonColor:'#3b82f6' }); return;
+                }
+                cats.push(name);
+            }
+            Storage.set(STORAGE_KEYS.CATEGORIES, cats);
+            bootstrap.Modal.getInstance(document.getElementById('categoryModal')).hide();
+            Swal.fire({ icon:'success', title:'Saved!', text:`Category "${name}" saved.`, timer:1500, showConfirmButton:false });
+            renderCategories(); updateStats();
+        }
+
+        function deleteCategory(index, name, count) {
+            if (count > 0) {
+                return Swal.fire({
+                    icon:'warning',
+                    title:'Category In Use',
+                    text:`${count} product(s) still use "${name}". Reassign those products before deleting the category.`
+                });
+            }
+            Swal.fire({
+                title: 'Delete Category?',
+                text: `Delete "${name}"?`,
+                icon: 'warning', showCancelButton: true,
+                confirmButtonColor: '#ef4444', cancelButtonColor: '#6b7280', confirmButtonText: 'Yes, delete'
+            }).then(r => {
+                if (r.isConfirmed) {
+                    const cats = Storage.get(STORAGE_KEYS.CATEGORIES, []);
+                    cats.splice(index, 1);
+                    Storage.set(STORAGE_KEYS.CATEGORIES, cats);
+                    Swal.fire({ icon:'success', title:'Deleted', text:`Category "${name}" removed.`, timer:1500, showConfirmButton:false });
+                    renderCategories(); updateStats();
+                }
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', function() { renderCategories(); updateStats(); });
+    </script>
+</body>
+</html>
